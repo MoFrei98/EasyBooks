@@ -1,0 +1,12 @@
+# Suche: Anfrage, erwartetes Ergebnis, dann die durchsuchten Felder. Gilt für Android und iOS.
+# query	expected	fields...
+aufstieg	true	Aufstieg des Horus
+Maerchen	true	Märchen
+märchen	true	Maerchen
+strasse	true	Straße
+cafe	true	Café
+horus abnett	true	Aufstieg des Horus	[Abnett_Dan]_Aufstieg.pdf
+horus tolkien	false	Aufstieg des Horus
+der leuchtturm	true	Der_Leuchtturm.pdf
+sommer 2023	true	Nordlicht	Lea Sommer 2023
+winter	false	Nordlicht	Lea Sommer

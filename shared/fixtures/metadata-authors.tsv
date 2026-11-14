@@ -1,0 +1,12 @@
+# Autor -> Vorname, Nachname ("-" = keine Angabe). Gilt für Android und iOS.
+# input	firstName	lastName
+Dan Abnett	Dan	Abnett
+Abnett, Dan	Dan	Abnett
+Johann Wolfgang von Goethe	Johann Wolfgang von	Goethe
+Terry Pratchett; Neil Gaiman	Terry	Pratchett
+Terry Pratchett and Neil Gaiman	Terry	Pratchett
+Homer	-	Homer
+Administrator	-	-
+jo	-	-
+user01	-	-
+max@example.org	-	-

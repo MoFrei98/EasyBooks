@@ -17,3 +17,10 @@ local.properties
 /app/release
 *.apk
 /.idea/
+
+# iOS: von XcodeGen und SwiftPM erzeugt
+/ios/EasyBooks.xcodeproj/
+/ios/EasyBooks/Info.plist
+/ios/build/
+.build/
+.swiftpm/

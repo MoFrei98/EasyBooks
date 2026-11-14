@@ -210,14 +210,16 @@ class ReflowLayouter(
         val prev = previous
         val colW = column.second - column.first
         val indent = line.left - column.first
+        // Leerzeile(n) davor, z. B. unter einer Überschrift: Abstand übernehmen.
         var space = 0f
+        if (prev != null && !prev.figure && prev.page == page) {
+            val gap = line.baseline - prev.line.baseline
+            if (gap > 1.6f * style.pitch) space = min((gap - style.pitch) * k, 2.5f * pitchOut)
+        }
         val start = when {
             prev == null || prev.figure -> true
             centered || prev.centered -> true
-            prev.page == page && line.baseline - prev.line.baseline > 1.6f * style.pitch -> {
-                space = min((line.baseline - prev.line.baseline - style.pitch) * k, 2.5f * pitchOut)
-                true
-            }
+            space > 0f -> true
             prev.line.words.last().hyphenated -> false
             indent > max(0.9f * xh, 0.025f * colW) -> true
             else -> {
