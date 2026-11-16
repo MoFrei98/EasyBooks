@@ -40,13 +40,17 @@ import com.example.easybooks.data.PageTurn
 import com.example.easybooks.data.ZoomMode
 import com.example.easybooks.pdf.Crop
 import com.example.easybooks.ui.theme.DarkReaderColors
-import com.example.easybooks.ui.theme.LightReaderColors
 import com.example.easybooks.ui.theme.LocalReaderColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val PageHPadding = 12.dp
 internal val PageHPaddingClose = 2.dp
 private val PageVPadding = 16.dp
 internal val ReflowVPadding = 10.dp
+
+/** Andere Papierflecken für neu umbrochene Seiten als für PDF-Seiten mit gleicher Nummer. */
+private const val REFLOW_SEED = 50021
 
 /**
  * Eine einzelne PDF-Seite im Reader (Schriftgröße Klein oder Normal).
@@ -103,9 +107,15 @@ internal fun PageView(
         val scrollable = height > availableHeight + 1.dp
 
         val widthPx = with(LocalDensity.current) { width.roundToPx() }
-        val bitmap = rememberResult(page, widthPx, crop) { vm.renderPage(page, widthPx, crop) }
-        // Im Dark Mode erst wissen, ob es eine Bildseite ist, damit nichts aufblitzt.
-        val imagePage = if (darkPages) rememberResult(page, "image") { vm.isImagePage(page) } else false
+        val aged = LocalReaderColors.current.aged
+        // Im Dark Mode und auf altem Papier erst wissen, ob es eine Bildseite ist, damit nichts aufblitzt.
+        val imagePage = if (darkPages || aged) rememberResult(page, "image") { vm.isImagePage(page) } else false
+        val bitmap = rememberResult(page, widthPx, crop, aged, darkPages, imagePage) {
+            val raw = vm.renderPage(page, widthPx, crop)
+            if (aged && imagePage != null) {
+                withContext(Dispatchers.Default) { AgedPaper.print(raw, seed = page, dark = darkPages, picture = imagePage) }
+            } else raw
+        }
 
         Sheet(
             page = page,
@@ -142,9 +152,17 @@ internal fun ReflowPageView(
     PageBox(index, pageTurn, pageOffset, onTap, modifier) {
         val frame = layout.params.frame
         val density = LocalDensity.current
-        val bitmap = rememberResult(layout.params, index) { vm.renderReflowPage(layout, index) }
         val screenPage = layout.pages.getOrNull(index)
         val imageOnly = screenPage?.imageOnly == true
+        val aged = LocalReaderColors.current.aged
+        val bitmap = rememberResult(layout.params, index, aged, darkPages) {
+            val raw = vm.renderReflowPage(layout, index)
+            if (aged && raw != null) {
+                withContext(Dispatchers.Default) {
+                    AgedPaper.print(raw, seed = REFLOW_SEED + index, dark = darkPages, picture = imageOnly)
+                }
+            } else raw
+        }
         // Ganzseitige Bilder (z. B. Cover) liegen auf einem Blatt in ihrer eigenen Größe.
         val image = screenPage?.placements?.singleOrNull()?.takeIf { imageOnly }
         val count = layout.estimatedCount
@@ -153,7 +171,7 @@ internal fun ReflowPageView(
             width = with(density) { (image?.dstWidth ?: frame.width.toFloat()).toDp() },
             height = with(density) { (image?.dstHeight ?: frame.height.toFloat()).toDp() },
             bitmap = bitmap,
-            imagePage = if (darkPages) imageOnly else false,
+            imagePage = if (darkPages || aged) imageOnly else false,
             readFraction = if (count > 1) (index / (count - 1f)).coerceAtMost(1f) else 0f,
             pageTurn = pageTurn,
             darkPages = darkPages,
@@ -209,14 +227,17 @@ private fun Sheet(
     scrollable: Boolean,
 ) {
     val curl = pageTurn == PageTurn.CURL
-    val paperColor = if (darkPages) DarkReaderColors.paper else LightReaderColors.paper
+    val readerColors = LocalReaderColors.current
+    val paperColor = readerColors.paper
     val nightFilter = remember { PageColors.night(DarkReaderColors.paper, DarkReaderColors.ink) }
-    val shadowColor = LocalReaderColors.current.shade
+    val shadowColor = readerColors.shade
     // Nur während die Seite gerade umgeblättert wird, zeichnen wir sie als gebogenes 3D-Blatt.
     val turning by remember(curl) {
         derivedStateOf { curl && pageOffset().let { it > 0f && it < 1f } }
     }
     val colorFilter = when {
+        // Altes Papier: Die Seite ist schon auf das Papier gedruckt.
+        readerColors.aged -> null
         !darkPages -> PageColors.day
         imagePage == true -> PageColors.dimmedImage
         else -> nightFilter

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Startbildschirm (Android 12+): das Buch aus dem App-Icon auf Bibliotheksgrün. -->
+    <style name="Theme.EasyBooks" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_fg</item>
+    </style>
+</resources>

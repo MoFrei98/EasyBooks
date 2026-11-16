@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -14,33 +15,42 @@ import androidx.core.view.WindowCompat
 val LocalDarkTheme = staticCompositionLocalOf { false }
 
 /** Farben rund um die Seiten im Reader. */
-val LocalReaderColors = staticCompositionLocalOf { LightReaderColors }
+val LocalReaderColors = staticCompositionLocalOf { AgedLightReaderColors }
 
+/**
+ * Stil "Alte Bücherei": Pergament, Leder, Messing und Holz.
+ *
+ * @param decorated Verzierte Schriften (sonst Systemschrift)
+ * @param agedPaper Buchseiten im Reader sehen alt aus
+ */
 @Composable
 fun EasyBooksTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    decorated: Boolean = true,
+    agedPaper: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            // Statusleisten-Symbole passend zum gewählten Design einfärben,
-            // auch wenn es vom System-Design abweicht.
             val window = (view.context as? Activity)?.window ?: return@SideEffect
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
+                // Oben liegt immer eine dunkle Lederleiste: helle Symbole.
+                isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }
+    val typography = remember(decorated) { appTypography(decorated) }
 
     CompositionLocalProvider(
         LocalDarkTheme provides darkTheme,
-        LocalReaderColors provides if (darkTheme) DarkReaderColors else LightReaderColors,
+        LocalDecorated provides decorated,
+        LocalReaderColors provides readerColors(darkTheme, agedPaper),
     ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
-            typography = Typography,
+            typography = typography,
             content = content,
         )
     }

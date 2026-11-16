@@ -97,6 +97,16 @@
     <string name="library_folder_hint">Ordner auf dem Gerät, in dem Easy Books deine Bücher sortiert.</string>
     <string name="change">Ändern</string>
     <string name="choose">Wählen</string>
+    <string name="settings_app_font">Schrift der App</string>
+    <string name="app_font_normal">Normal</string>
+    <string name="app_font_decorated">Verziert</string>
+    <string name="app_font_normal_hint">Systemschrift. Farben und Verzierungen bleiben.</string>
+    <string name="app_font_decorated_hint">Alte Buchschriften für Titel und Texte. Die Schrift in den Büchern ändert sich nicht.</string>
+    <string name="settings_paper">Papier</string>
+    <string name="paper_aged">Gealtert</string>
+    <string name="paper_plain">Hell</string>
+    <string name="paper_aged_hint">Vergilbtes Papier mit brauner Tinte</string>
+    <string name="paper_plain_hint">Helles Papier, schwarze Schrift</string>
     <string name="settings_page_size">Schriftgröße</string>
     <string name="settings_page_turn">Blättern</string>
     <string name="page_turn_curl">Buchseiten</string>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Vordergrund des App-Icons: grüner Ledereinband mit Messingrahmen, Lilie, Messingecken
+    und rotem Lesebändchen. Gezeichnet in den Koordinaten von tools/icon/easybooks-icon.svg
+    (200 × 200) und auf die sichere Zone des adaptiven Icons verkleinert.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.37"
+        android:scaleY="0.37"
+        android:translateX="15.7"
+        android:translateY="16.3">
+
+        <!-- Buchrücken mit Bünden und roten Rückenschildern -->
+        <path android:fillColor="#FF16291A" android:pathData="M50,36h10a6,6 0,0 1,6 6v120a6,6 0,0 1,-6 6h-10a6,6 0,0 1,-6 -6v-120a6,6 0,0 1,6 -6z" />
+        <path android:fillColor="#FFC9A043" android:pathData="M44,52h22v4h-22z M44,150h22v4h-22z" />
+        <path android:fillColor="#FF8E2A1E" android:pathData="M49.5,64h11a1.5,1.5 0,0 1,1.5 1.5v21a1.5,1.5 0,0 1,-1.5 1.5h-11a1.5,1.5 0,0 1,-1.5 -1.5v-21a1.5,1.5 0,0 1,1.5 -1.5z M49.5,118h11a1.5,1.5 0,0 1,1.5 1.5v21a1.5,1.5 0,0 1,-1.5 1.5h-11a1.5,1.5 0,0 1,-1.5 -1.5v-21a1.5,1.5 0,0 1,1.5 -1.5z" />
+
+        <!-- Buchblock (Seitenkanten) -->
+        <path android:fillColor="#FFE6D3A8" android:pathData="M158,40h3a2,2 0,0 1,2 2v120a2,2 0,0 1,-2 2h-3a2,2 0,0 1,-2 -2v-120a2,2 0,0 1,2 -2z" />
+        <path android:strokeColor="#FFB39A66" android:strokeWidth="0.7" android:pathData="M157.5,44V160 M160,44V160" />
+
+        <!-- Deckel aus grünem Leder -->
+        <path android:pathData="M64,34h88a6,6 0,0 1,6 6v124a6,6 0,0 1,-6 6h-88a6,6 0,0 1,-6 -6v-124a6,6 0,0 1,6 -6z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="58"
+                    android:startY="34"
+                    android:endX="158"
+                    android:endY="170">
+                    <item android:offset="0" android:color="#FF3E6B44" />
+                    <item android:offset="0.6" android:color="#FF25432A" />
+                    <item android:offset="1" android:color="#FF17301C" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Goldrahmen -->
+        <path android:strokeColor="#FFD9B562" android:strokeWidth="2.6" android:pathData="M70,45h76a2,2 0,0 1,2 2v110a2,2 0,0 1,-2 2h-76a2,2 0,0 1,-2 -2v-110a2,2 0,0 1,2 -2z" />
+        <path android:strokeColor="#FFC9A55A" android:strokeWidth="0.9" android:pathData="M73.5,50.5h69v103h-69z" />
+
+        <!-- Lilie -->
+        <group android:translateX="86" android:translateY="70" android:scaleX="1.1" android:scaleY="1.1">
+            <path android:fillColor="#FFE2BE6A" android:pathData="M20,1C15,9 14.5,18 20,27C25.5,18 25,9 20,1Z M18.5,28C11,29 3.5,25 4,17C4.4,11 10.5,9.5 13,13.5C14.8,16.5 12.5,20 10,19C12,23 15,25.5 18.5,25Z M21.5,28C29,29 36.5,25 36,17C35.6,11 29.5,9.5 27,13.5C25.2,16.5 27.5,20 30,19C28,23 25,25.5 21.5,25Z M11.2,26.5H28.8Q30,26.5 30,27.7V29.3Q30,30.5 28.8,30.5H11.2Q10,30.5 10,29.3V27.7Q10,26.5 11.2,26.5Z M17,31L20,46L23,31Z M16,31C13,35 10,36 7,40C11,39.5 14,37 16.5,33Z M24,31C27,35 30,36 33,40C29,39.5 26,37 23.5,33Z" />
+        </group>
+        <path android:strokeColor="#FFC9A55A" android:strokeWidth="1.4" android:pathData="M86,135H130" />
+        <path android:fillColor="#FFE2BE6A" android:pathData="M105.7,135a2.3,2.3 0,1 0,4.6 0a2.3,2.3 0,1 0,-4.6 0z" />
+
+        <!-- Messingecken: oben links, oben rechts, unten links, unten rechts -->
+        <group android:translateX="58" android:translateY="34" android:scaleX="0.6" android:scaleY="0.6">
+            <path android:fillColor="#FFC9A043" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M0,0H37Q34,7 27,8.5Q20,9.5 17.5,14Q13,16 10.5,21Q8.5,28 8,37Q4,36 0,39Z" />
+            <path android:strokeColor="#8CFFF1C4" android:strokeWidth="0.8" android:pathData="M4,4H24Q19,6 15,10Q10,13 8,18Q6,21 4,23" />
+            <path android:fillColor="#FFF1D48A" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M5.3,8.5a3.2,3.2 0,1 0,6.4 0a3.2,3.2 0,1 0,-6.4 0z" />
+        </group>
+        <group android:translateX="158" android:translateY="34" android:scaleX="-0.6" android:scaleY="0.6">
+            <path android:fillColor="#FFC9A043" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M0,0H37Q34,7 27,8.5Q20,9.5 17.5,14Q13,16 10.5,21Q8.5,28 8,37Q4,36 0,39Z" />
+            <path android:strokeColor="#8CFFF1C4" android:strokeWidth="0.8" android:pathData="M4,4H24Q19,6 15,10Q10,13 8,18Q6,21 4,23" />
+            <path android:fillColor="#FFF1D48A" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M5.3,8.5a3.2,3.2 0,1 0,6.4 0a3.2,3.2 0,1 0,-6.4 0z" />
+        </group>
+        <group android:translateX="58" android:translateY="170" android:scaleX="0.6" android:scaleY="-0.6">
+            <path android:fillColor="#FFC9A043" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M0,0H37Q34,7 27,8.5Q20,9.5 17.5,14Q13,16 10.5,21Q8.5,28 8,37Q4,36 0,39Z" />
+            <path android:fillColor="#FFF1D48A" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M5.3,8.5a3.2,3.2 0,1 0,6.4 0a3.2,3.2 0,1 0,-6.4 0z" />
+        </group>
+        <group android:translateX="158" android:translateY="170" android:scaleX="-0.6" android:scaleY="-0.6">
+            <path android:fillColor="#FFC9A043" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M0,0H37Q34,7 27,8.5Q20,9.5 17.5,14Q13,16 10.5,21Q8.5,28 8,37Q4,36 0,39Z" />
+            <path android:fillColor="#FFF1D48A" android:strokeColor="#FF4E3812" android:strokeWidth="0.9" android:pathData="M5.3,8.5a3.2,3.2 0,1 0,6.4 0a3.2,3.2 0,1 0,-6.4 0z" />
+        </group>
+
+        <!-- Lesebändchen -->
+        <path android:fillColor="#FF9A2E20" android:pathData="M124,30h13v152l-6.5,-7.5 -6.5,7.5z" />
+        <path android:strokeColor="#B3C2493A" android:strokeWidth="1.2" android:pathData="M126,30v146" />
+    </group>
+</vector>

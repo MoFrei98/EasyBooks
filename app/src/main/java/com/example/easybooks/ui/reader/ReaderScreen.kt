@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,18 +31,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
@@ -83,8 +77,15 @@ import com.example.easybooks.data.PageTurn
 import com.example.easybooks.data.ZoomMode
 import com.example.easybooks.reflow.ReflowFrame
 import com.example.easybooks.ui.settings.ThemeToggleButton
+import com.example.easybooks.ui.theme.BrassRule
+import com.example.easybooks.ui.theme.LeatherTopBar
 import com.example.easybooks.ui.theme.LocalDarkTheme
-import com.example.easybooks.ui.theme.LocalReaderColors
+import com.example.easybooks.ui.theme.Palette
+import com.example.easybooks.ui.theme.Plaque
+import com.example.easybooks.ui.theme.PlaqueStyle
+import com.example.easybooks.ui.theme.brassSliderColors
+import com.example.easybooks.ui.theme.leatherBackground
+import com.example.easybooks.ui.theme.woodBackground
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -100,14 +101,16 @@ fun ReaderScreen(
 ) {
     val vm: ReaderViewModel = viewModel(factory = ReaderViewModel.factory(bookId))
     val state by vm.state.collectAsStateWithLifecycle()
+    LightNavigationIcons()
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(LocalReaderColors.current.backdrop)
+            // Die Seiten liegen auf einem Lesetisch aus Holz.
+            .woodBackground(LocalDarkTheme.current)
     ) {
         when (val s = state) {
-            ReaderState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+            ReaderState.Loading -> CircularProgressIndicator(color = Palette.BrassLight, modifier = Modifier.align(Alignment.Center))
             is ReaderState.Failed -> ReaderError(
                 state = s,
                 onBack = onBack,
@@ -254,20 +257,24 @@ private fun ReflowPreparing(
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            CircularProgressIndicator(progress = { progress.coerceIn(0.02f, 1f) })
+            CircularProgressIndicator(
+                progress = { progress.coerceIn(0.02f, 1f) },
+                color = Palette.BrassLight,
+                trackColor = Palette.BrassLight.copy(alpha = 0.2f),
+            )
             Spacer(Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.reflow_preparing, (progress * 100).roundToInt()),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = Palette.OnWood,
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.reflow_preparing_hint),
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Palette.BrassLight.copy(alpha = 0.8f),
             )
         }
         ReaderTopBar(title = title, onBack = onBack, actions = actions)
@@ -430,14 +437,14 @@ private fun PagedReader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderTopBar(
     title: String,
     onBack: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    TopAppBar(
+    LeatherTopBar(
+        medallion = false,
         title = {
             Text(
                 text = title,
@@ -452,9 +459,6 @@ private fun ReaderTopBar(
             }
         },
         actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
     )
 }
 
@@ -468,12 +472,13 @@ private fun ReaderBottomBar(
 ) {
     var dragValue by remember { mutableStateOf<Float?>(null) }
     val shownPage = dragValue?.roundToInt() ?: currentPage
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        // Textfarbe ausdrücklich setzen, sonst erbt sie eine dunkle Farbe von außen.
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.fillMaxWidth(),
+    val night = LocalDarkTheme.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .leatherBackground(night, flip = true)
     ) {
+        BrassRule(medallion = false, modifier = Modifier.graphicsLayer { rotationZ = 180f })
         Column(
             Modifier
                 .navigationBarsPadding()
@@ -486,12 +491,14 @@ private fun ReaderBottomBar(
                     shownPage + 1,
                     max(shownCount, pageCount),
                 ),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Palette.BrassLight,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
             if (pageCount > 1) {
                 Slider(
+                    colors = brassSliderColors(),
                     value = dragValue ?: currentPage.toFloat(),
                     onValueChange = { dragValue = it },
                     onValueChangeFinished = {
@@ -520,15 +527,28 @@ private fun ReaderError(
             text = state.message,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = Palette.OnWood,
         )
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            Plaque(text = stringResource(R.string.back), onClick = onBack, style = PlaqueStyle.LEATHER, small = true)
             if (state.canRemove) {
-                Button(onClick = onRemove) { Text(stringResource(R.string.remove_from_library)) }
+                Plaque(text = stringResource(R.string.remove_from_library), onClick = onRemove, small = true)
             }
         }
+    }
+}
+
+/** Unten liegt im Reader eine Lederleiste oder Holz: helle Symbole in der Navigationsleiste. */
+@Composable
+private fun LightNavigationIcons() {
+    val activity = LocalActivity.current ?: return
+    val view = LocalView.current
+    val dark = LocalDarkTheme.current
+    DisposableEffect(dark) {
+        val controller = WindowCompat.getInsetsController(activity.window, view)
+        controller.isAppearanceLightNavigationBars = false
+        onDispose { controller.isAppearanceLightNavigationBars = !dark }
     }
 }
 

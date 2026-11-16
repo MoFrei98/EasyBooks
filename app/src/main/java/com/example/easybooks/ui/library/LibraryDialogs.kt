@@ -16,12 +16,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +40,12 @@ import androidx.compose.ui.unit.dp
 import com.example.easybooks.R
 import com.example.easybooks.data.Book
 import com.example.easybooks.data.FolderPaths
+import com.example.easybooks.ui.theme.DialogConfirmButton
+import com.example.easybooks.ui.theme.DialogDismissButton
+import com.example.easybooks.ui.theme.OrnateDialog
+import com.example.easybooks.ui.theme.Plaque
+import com.example.easybooks.ui.theme.PlaqueStyle
+import com.example.easybooks.ui.theme.parchmentFieldColors
 
 /** Eingabe eines Namens, z. B. für einen neuen Ordner. */
 @Composable
@@ -55,25 +59,23 @@ internal fun NameDialog(
     var text by rememberSaveable { mutableStateOf(initial) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    AlertDialog(
+    OrnateDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text(stringResource(R.string.name_label)) },
-                singleLine = true,
-                modifier = Modifier.focusRequester(focus),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) { Text(confirmLabel) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+        title = title,
+        confirmButton = { DialogConfirmButton(confirmLabel, { onConfirm(text) }, enabled = text.isNotBlank()) },
+        dismissButton = { DialogDismissButton(stringResource(R.string.cancel), onDismiss) },
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text(stringResource(R.string.name_label)) },
+            singleLine = true,
+            colors = parchmentFieldColors(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focus),
+        )
+    }
 }
 
 /** Titel, Autor und Erscheinungsjahr eines Buchs bearbeiten. */
@@ -89,65 +91,71 @@ internal fun BookDetailsDialog(
     var year by rememberSaveable(book.uuid) { mutableStateOf(book.publishYear?.toString().orEmpty()) }
     val yearValid = year.isBlank() || year.trim().toIntOrNull()?.let { it in 1000..2100 } == true
 
-    AlertDialog(
+    OrnateDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.details_title)) },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-            ) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.title_label)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = firstName,
-                    onValueChange = { firstName = it },
-                    label = { Text(stringResource(R.string.author_firstname)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = lastName,
-                    onValueChange = { lastName = it },
-                    label = { Text(stringResource(R.string.author_lastname)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = year,
-                    onValueChange = { input -> year = input.filter { it.isDigit() }.take(4) },
-                    label = { Text(stringResource(R.string.publish_year)) },
-                    singleLine = true,
-                    isError = !yearValid,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-                // Nur zur Info, nicht bearbeitbar.
-                if (book.pageCount > 0) {
-                    Text(
-                        stringResource(R.string.details_pages, book.pageCount),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+        title = stringResource(R.string.details_title),
+        confirmButton = {
+            DialogConfirmButton(
+                stringResource(R.string.save),
+                { onSave(title, firstName, lastName, year) },
+                enabled = title.isNotBlank() && yearValid,
+            )
+        },
+        dismissButton = { DialogDismissButton(stringResource(R.string.cancel), onDismiss) },
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+        ) {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(stringResource(R.string.title_label)) },
+                singleLine = true,
+                colors = parchmentFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = firstName,
+                onValueChange = { firstName = it },
+                label = { Text(stringResource(R.string.author_firstname)) },
+                singleLine = true,
+                colors = parchmentFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = lastName,
+                onValueChange = { lastName = it },
+                label = { Text(stringResource(R.string.author_lastname)) },
+                singleLine = true,
+                colors = parchmentFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = year,
+                onValueChange = { input -> year = input.filter { it.isDigit() }.take(4) },
+                label = { Text(stringResource(R.string.publish_year)) },
+                singleLine = true,
+                isError = !yearValid,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = parchmentFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // Nur zur Info, nicht bearbeitbar.
+            if (book.pageCount > 0) {
                 Text(
-                    stringResource(R.string.details_location, book.pdfLocation ?: book.fileName ?: "–"),
+                    stringResource(R.string.details_pages, book.pageCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onSave(title, firstName, lastName, year) },
-                enabled = title.isNotBlank() && yearValid,
-            ) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+            Text(
+                stringResource(R.string.details_location, book.pdfLocation ?: book.fileName ?: "–"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /** Rückfrage vor einer Aktion, die sich nicht rückgängig machen lässt. */
@@ -159,31 +167,39 @@ internal fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    OrnateDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(text) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
+        title = title,
+        confirmButton = { DialogConfirmButton(confirmLabel, onConfirm) },
+        dismissButton = { DialogDismissButton(stringResource(R.string.cancel), onDismiss) },
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 /** Erklärt den Bibliotheksordner, bevor der System-Ordnerdialog öffnet. */
 @Composable
 internal fun LibraryFolderDialog(onChoose: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    OrnateDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
-        title = { Text(stringResource(R.string.library_folder_title)) },
-        text = { Text(stringResource(R.string.library_folder_text)) },
+        icon = {
+            Icon(
+                painterResource(R.drawable.ic_folder),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        title = stringResource(R.string.library_folder_title),
         confirmButton = {
-            TextButton(onClick = {
+            DialogConfirmButton(stringResource(R.string.choose_folder), {
                 onDismiss()
                 onChoose()
-            }) { Text(stringResource(R.string.choose_folder)) }
+            })
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
+        dismissButton = { DialogDismissButton(stringResource(R.string.cancel), onDismiss) },
+    ) {
+        Text(stringResource(R.string.library_folder_text), style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 /** Zielordner für ein Buch auswählen. */
@@ -195,46 +211,46 @@ internal fun MoveBookDialog(
     onNewFolder: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    OrnateDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.move_title)) },
-        text = {
-            Column {
-                Text(
-                    book.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                    item {
-                        FolderRow(
-                            label = stringResource(R.string.library_root),
-                            depth = 0,
-                            current = book.folder == FolderPaths.ROOT,
-                            onClick = { onMove(FolderPaths.ROOT) },
-                        )
-                    }
-                    items(folders, key = { it }) { path ->
-                        FolderRow(
-                            label = FolderPaths.name(path),
-                            depth = FolderPaths.depth(path),
-                            current = book.folder == path,
-                            onClick = { onMove(path) },
-                        )
-                    }
-                }
-            }
-        },
+        title = stringResource(R.string.move_title),
         confirmButton = {
-            TextButton(onClick = onNewFolder) { Text(stringResource(R.string.new_folder)) }
+            Plaque(
+                text = stringResource(R.string.new_folder),
+                onClick = onNewFolder,
+                style = PlaqueStyle.OUTLINE,
+                small = true,
+            )
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+        dismissButton = { DialogDismissButton(stringResource(R.string.cancel), onDismiss) },
+    ) {
+        Text(
+            book.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        LazyColumn(Modifier.heightIn(max = 360.dp)) {
+            item {
+                FolderRow(
+                    label = stringResource(R.string.library_root),
+                    depth = 0,
+                    current = book.folder == FolderPaths.ROOT,
+                    onClick = { onMove(FolderPaths.ROOT) },
+                )
+            }
+            items(folders, key = { it }) { path ->
+                FolderRow(
+                    label = FolderPaths.name(path),
+                    depth = FolderPaths.depth(path),
+                    current = book.folder == path,
+                    onClick = { onMove(path) },
+                )
+            }
+        }
+    }
 }
 
 @Composable

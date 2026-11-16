@@ -11,6 +11,24 @@ import kotlinx.coroutines.flow.map
 /** Helles oder dunkles Design. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** Schrift der App-Oberfläche. Die Schrift in den Büchern ändert sich nie. */
+enum class AppFont {
+    /** Systemschrift. */
+    NORMAL,
+
+    /** Alte Buchschriften: Tangerine für Titel, IM Fell English und Alegreya für den Rest. */
+    DECORATED,
+}
+
+/** Papier der Buchseiten im Reader. */
+enum class PaperStyle {
+    /** Vergilbtes, altes Papier mit brauner Tinte. */
+    AGED,
+
+    /** Helles Papier wie bisher. */
+    PLAIN,
+}
+
 /** Reihenfolge der Bücher in der Bibliothek. */
 enum class LibrarySort { RECENT, TITLE }
 
@@ -36,6 +54,8 @@ data class AppSettings(
     val libraryLabel: String? = null,
     val sort: LibrarySort = LibrarySort.RECENT,
     val filter: BookFilter = BookFilter.ALL,
+    val appFont: AppFont = AppFont.DECORATED,
+    val paper: PaperStyle = PaperStyle.AGED,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -48,6 +68,8 @@ class SettingsRepository(private val context: Context) {
     private val libraryLabelKey = stringPreferencesKey("library_label")
     private val sortKey = stringPreferencesKey("sort")
     private val filterKey = stringPreferencesKey("filter")
+    private val appFontKey = stringPreferencesKey("app_font")
+    private val paperKey = stringPreferencesKey("paper")
 
     val settings: Flow<AppSettings> = context.easyBooksDataStore.data
         .map { prefs ->
@@ -60,6 +82,8 @@ class SettingsRepository(private val context: Context) {
                 libraryLabel = prefs[libraryLabelKey],
                 sort = enumOrDefault(prefs[sortKey], LibrarySort.RECENT),
                 filter = enumOrDefault(prefs[filterKey], BookFilter.ALL),
+                appFont = enumOrDefault(prefs[appFontKey], AppFont.DECORATED),
+                paper = enumOrDefault(prefs[paperKey], PaperStyle.AGED),
             )
         }
         .distinctUntilChanged()
@@ -89,6 +113,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setFilter(value: BookFilter) {
         context.easyBooksDataStore.edit { it[filterKey] = value.name }
+    }
+
+    suspend fun setAppFont(value: AppFont) {
+        context.easyBooksDataStore.edit { it[appFontKey] = value.name }
+    }
+
+    suspend fun setPaper(value: PaperStyle) {
+        context.easyBooksDataStore.edit { it[paperKey] = value.name }
     }
 
     suspend fun setSort(value: LibrarySort) {
