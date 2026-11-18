@@ -25,7 +25,8 @@ class ReflowAnalysis(
 
 object ReflowCache {
     private const val MAGIC = 0x45424652 // "EBFR" (alter App-Name; bleibt, damit gespeicherte Analysen gültig bleiben)
-    private const val VERSION = 1
+    /** 2: Wortgrenzen mit blassen Pixeln (Issue #34); ältere Analysen werden neu erstellt. */
+    private const val VERSION = 2
 
     fun write(analysis: ReflowAnalysis, file: File) {
         file.parentFile?.mkdirs()

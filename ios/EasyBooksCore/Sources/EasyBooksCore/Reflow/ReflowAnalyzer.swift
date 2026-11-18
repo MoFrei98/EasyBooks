@@ -7,6 +7,10 @@ public enum ReflowAnalyzer {
     private static let imageLuminance = 0.55
     /// Pixel dunkler als dieser Anteil der Papierhelligkeit gelten als Tinte.
     private static let inkFactor = 0.63
+    /// Für die Trennung in Wörter zählen auch blasse Pixel zum Buchstaben: feine Haarstriche
+    /// (der Querstrich im H) und geglättete Kanten. Sonst zerfällt ein H in zwei Teile und
+    /// etwas weitere Buchstabenabstände (nach dem J) sehen aus wie Wortabstände.
+    private static let faintFactor = 0.85
     /// Pixel heller als dieser Wert gehören bei Bildseiten zum Rand.
     private static let white = 232
 
@@ -31,7 +35,9 @@ public enum ReflowAnalyzer {
         let paper = percentile(histogram, n, 0.9)
         let threshold = Int((Double(paper) * inkFactor).rounded())
         let ink = lum.map { Int($0) < threshold }
-        return Page(ink: ink, width: width, height: height).analyze()
+        let faintThreshold = Int((Double(paper) * faintFactor).rounded())
+        let faint = lum.map { Int($0) < faintThreshold }
+        return Page(ink: ink, faint: faint, width: width, height: height).analyze()
     }
 
     /// Ganze Seite als ein Bild, begrenzt auf den nicht weißen Bereich.
@@ -76,7 +82,10 @@ public enum ReflowAnalyzer {
     }
 
     private struct Page {
+        /// Pixel, die sicher Tinte sind (Zeilen, x-Höhe, Bilder, Trennstriche).
         let ink: [Bool]
+        /// Auch blasse Pixel; nur für die Grenzen der Buchstaben und Wörter.
+        let faint: [Bool]
         let width: Int
         let height: Int
 
@@ -273,7 +282,7 @@ public enum ReflowAnalyzer {
             var cols = [Int](repeating: 0, count: x1 - x0)
             for y in line.top..<line.bottom {
                 let row = y * width
-                for x in x0..<x1 where ink[row + x] { cols[x - x0] += 1 }
+                for x in x0..<x1 where faint[row + x] { cols[x - x0] += 1 }
             }
             var bounds: [Int] = []
             var x = 0
@@ -313,17 +322,31 @@ public enum ReflowAnalyzer {
             }
             let lo = max(2, Int((Double(xh) * 0.35).rounded()))
             let hi = max(lo, Int((Double(xh) * 0.75).rounded()))
-            var best = Int((Double(xh) * 0.55).rounded())
-            var bestCount = Int.max
-            for t in lo...hi {
+            // Etwas geglättet, damit einzelne Ausreißer nicht entscheiden.
+            func smoothed(_ t: Int) -> Int {
                 let next = t + 1 < counts.count ? counts[t + 1] : 0
-                let c = counts[t - 1] + 2 * counts[t] + next
-                if c < bestCount {
-                    bestCount = c
-                    best = t
+                return counts[t - 1] + 2 * counts[t] + next
+            }
+            let bestCount = (lo...hi).map(smoothed).min()!
+            // Oft ist eine ganze Strecke leer. Dann die Mitte der längsten leeren Strecke
+            // nehmen, nicht ihren Anfang: Ein etwas weiterer Buchstabenabstand (z. B. nach
+            // einem J) darf noch kein Wortabstand sein.
+            var bestStart = lo
+            var bestLength = 0
+            var t = lo
+            while t <= hi {
+                if smoothed(t) == bestCount {
+                    let start = t
+                    while t <= hi && smoothed(t) == bestCount { t += 1 }
+                    if t - start > bestLength {
+                        bestStart = start
+                        bestLength = t - start
+                    }
+                } else {
+                    t += 1
                 }
             }
-            return Double(best)
+            return Double(bestStart) + Double(bestLength - 1) / 2
         }
 
         private func withWords(_ line: TextLine, _ glyphs: [Int], _ threshold: Double) -> TextLine {
