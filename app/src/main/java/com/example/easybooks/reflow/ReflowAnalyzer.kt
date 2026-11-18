@@ -17,6 +17,13 @@ object ReflowAnalyzer {
     /** Pixel dunkler als dieser Anteil der Papierhelligkeit gelten als Tinte. */
     private const val INK_FACTOR = 0.63
 
+    /**
+     * Für die Trennung in Wörter zählen auch blasse Pixel zum Buchstaben: feine Haarstriche
+     * (der Querstrich im H) und geglättete Kanten. Sonst zerfällt ein H in zwei Teile und
+     * etwas weitere Buchstabenabstände (nach dem J) sehen aus wie Wortabstände.
+     */
+    private const val FAINT_FACTOR = 0.85
+
     /** Pixel heller als dieser Wert gehören bei Bildseiten zum Rand. */
     private const val WHITE = 232
 
@@ -38,7 +45,9 @@ object ReflowAnalyzer {
         val paper = percentile(histogram, n, 0.9)
         val threshold = (paper * INK_FACTOR).roundToInt()
         val ink = BooleanArray(n) { (lum[it].toInt() and 0xFF) < threshold }
-        return Page(ink, width, height).analyze()
+        val faintThreshold = (paper * FAINT_FACTOR).roundToInt()
+        val faint = BooleanArray(n) { (lum[it].toInt() and 0xFF) < faintThreshold }
+        return Page(ink, faint, width, height).analyze()
     }
 
     /** Ganze Seite als ein Bild, begrenzt auf den nicht weißen Bereich. */
@@ -81,7 +90,11 @@ object ReflowAnalyzer {
         val height: Int get() = bottom - top
     }
 
-    private class Page(val ink: BooleanArray, val width: Int, val height: Int) {
+    /**
+     * @param ink Pixel, die sicher Tinte sind (Zeilen, x-Höhe, Bilder, Trennstriche)
+     * @param faint auch blasse Pixel; nur für die Grenzen der Buchstaben und Wörter
+     */
+    private class Page(val ink: BooleanArray, val faint: BooleanArray, val width: Int, val height: Int) {
 
         fun analyze(): PageText {
             val colInk = IntArray(width)
@@ -202,7 +215,7 @@ object ReflowAnalyzer {
             val cols = IntArray(x1 - x0)
             for (y in line.top until line.bottom) {
                 val row = y * width
-                for (x in x0 until x1) if (ink[row + x]) cols[x - x0]++
+                for (x in x0 until x1) if (faint[row + x]) cols[x - x0]++
             }
             val bounds = ArrayList<Int>()
             var x = 0
@@ -243,17 +256,28 @@ object ReflowAnalyzer {
             }
             val lo = max(2, (xh * 0.35).roundToInt())
             val hi = max(lo, (xh * 0.75).roundToInt())
-            var best = (xh * 0.55).roundToInt()
-            var bestCount = Int.MAX_VALUE
-            for (t in lo..hi) {
-                // Etwas geglättet, damit einzelne Ausreißer nicht entscheiden.
-                val c = counts[t - 1] + 2 * counts[t] + counts.getOrElse(t + 1) { 0 }
-                if (c < bestCount) {
-                    bestCount = c
-                    best = t
+            // Etwas geglättet, damit einzelne Ausreißer nicht entscheiden.
+            fun smoothed(t: Int) = counts[t - 1] + 2 * counts[t] + counts.getOrElse(t + 1) { 0 }
+            val bestCount = (lo..hi).minOf { smoothed(it) }
+            // Oft ist eine ganze Strecke leer. Dann die Mitte der längsten leeren Strecke
+            // nehmen, nicht ihren Anfang: Ein etwas weiterer Buchstabenabstand (z. B. nach
+            // einem J) darf noch kein Wortabstand sein.
+            var bestStart = lo
+            var bestLength = 0
+            var t = lo
+            while (t <= hi) {
+                if (smoothed(t) == bestCount) {
+                    val start = t
+                    while (t <= hi && smoothed(t) == bestCount) t++
+                    if (t - start > bestLength) {
+                        bestStart = start
+                        bestLength = t - start
+                    }
+                } else {
+                    t++
                 }
             }
-            return best.toDouble()
+            return bestStart + (bestLength - 1) / 2.0
         }
 
         private fun mergeSmall(runs: List<Run>, typical: Int): ArrayList<Run> {
