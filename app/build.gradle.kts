@@ -18,8 +18,8 @@ android {
         applicationId = "com.example.ebf"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.5"
+        versionCode = 8
+        versionName = "1.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

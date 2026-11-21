@@ -109,6 +109,28 @@ final class ReflowAnalyzerTests: XCTestCase {
         XCTAssertEqual(text.lines[0].words.count, 4)
     }
 
+    /// Issue #34: Ein H mit blassgrauem Querstrich darf nicht in zwei Wörter zerfallen,
+    /// auch wenn die Lücke zwischen den Stämmen breiter ist als ein Wortabstand.
+    func testHWithFaintCrossbarStaysOneLetter() {
+        var page = SyntheticPage()
+        var starts: [Int] = []
+        for b in [60, 90, 120, 150, 180, 210] {
+            var x = page.word(40, b, 4) + 10
+            starts.append(x)
+            page.rect(x, b - 20, 3, 20)
+            page.rect(x + 14, b - 20, 3, 20)
+            page.rect(x + 3, b - 11, 11, 1, (0xB4, 0xB4, 0xB4))
+            x = page.word(x + 17 + 2, b, 5) + 10
+            page.line(x, b, [3, 6])
+        }
+        let text = page.analyze()
+        XCTAssertEqual(text.lines.count, 6)
+        for (i, line) in text.lines.enumerated() {
+            XCTAssertEqual(line.words.count, 4)
+            XCTAssertEqual(line.words[1].left, starts[i])
+        }
+    }
+
     func testTwoColumns() {
         var page = SyntheticPage(width: 700)
         for i in 0..<8 {

@@ -121,6 +121,31 @@ class ReflowAnalyzerTest {
     }
 
     @Test
+    fun `H with a faint hairline crossbar stays one letter`() {
+        // Issue #34: Bei feinen Schriften ist der Querstrich im H nur blassgrau gerendert.
+        // Die Lücke zwischen den Stämmen ist breiter als ein Wortabstand. Das H darf trotzdem
+        // nicht in zwei Wörter zerfallen.
+        val page = SyntheticPage()
+        val hairline = 0xFFB4B4B4.toInt() // heller als die Tinten-Schwelle, aber kein Papier
+        val starts = ArrayList<Int>()
+        for (b in listOf(60, 90, 120, 150, 180, 210)) {
+            var x = page.word(40, b, 4) + 10
+            starts += x
+            page.rect(x, b - 20, 3, 20)
+            page.rect(x + 14, b - 20, 3, 20)
+            page.rect(x + 3, b - 11, 11, 1, hairline)
+            x = page.word(x + 17 + 2, b, 5) + 10
+            page.line(x, b, listOf(3, 6))
+        }
+        val text = page.analyze()
+        assertEquals(6, text.lines.size)
+        for ((i, line) in text.lines.withIndex()) {
+            assertEquals(4, line.words.size)
+            assertEquals(starts[i], line.words[1].left)
+        }
+    }
+
+    @Test
     fun `two columns are read left then right`() {
         val page = SyntheticPage(width = 700)
         for (i in 0 until 8) {

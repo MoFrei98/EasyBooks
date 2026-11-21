@@ -22,7 +22,8 @@ public struct ReflowAnalysis: Equatable {
 /// Einfaches Binärformat (Big Endian). Die App komprimiert es zusätzlich.
 public enum ReflowCache {
     private static let magic: UInt32 = 0x4542_4652 // "EBFR" (alter App-Name; bleibt, damit gespeicherte Analysen gültig bleiben)
-    private static let version: UInt32 = 1
+    /// 2: Wortgrenzen mit blassen Pixeln (Issue #34); ältere Analysen werden neu erstellt.
+    private static let version: UInt32 = 2
 
     public static func encode(_ analysis: ReflowAnalysis) -> Data {
         var w = Writer()
