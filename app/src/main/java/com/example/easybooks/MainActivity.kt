@@ -30,9 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.easybooks.ui.library.LibraryScreen
 import com.example.easybooks.ui.library.LibraryViewModel
-import com.example.easybooks.data.AppFont
 import com.example.easybooks.data.AppSettings
-import com.example.easybooks.data.PaperStyle
 import com.example.easybooks.data.LibraryTree
 import com.example.easybooks.data.SettingsRepository
 import com.example.easybooks.data.ThemeMode
@@ -63,8 +61,7 @@ class MainActivity : ComponentActivity() {
             }
             EasyBooksTheme(
                 darkTheme = darkTheme,
-                decorated = current.appFont == AppFont.DECORATED,
-                agedPaper = current.paper == PaperStyle.AGED,
+                agedPaper = current.agedPaper,
             ) {
                 EasyBooksNavigation(libraryViewModel, current, settingsRepository)
             }
@@ -153,10 +150,8 @@ private fun EasyBooksNavigation(
             settings = settings,
             onThemeChange = { scope.launch { settingsRepository.setTheme(it) } },
             onPageSizeChange = { scope.launch { settingsRepository.setPageSize(it) } },
-            onPageTurnChange = { scope.launch { settingsRepository.setPageTurn(it) } },
+            onViewChange = { scope.launch { settingsRepository.setView(it) } },
             onPageTurnSoundChange = { scope.launch { settingsRepository.setPageTurnSound(it) } },
-            onAppFontChange = { scope.launch { settingsRepository.setAppFont(it) } },
-            onPaperChange = { scope.launch { settingsRepository.setPaper(it) } },
             onChooseLibraryFolder = {
                 showSettings = false
                 chooseLibraryFolder()

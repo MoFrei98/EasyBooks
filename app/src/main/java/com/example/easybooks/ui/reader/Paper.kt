@@ -8,25 +8,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import com.example.easybooks.ui.theme.LocalReaderColors
 import com.example.easybooks.ui.theme.ReaderColors
+import com.example.easybooks.ui.theme.Textures
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 private const val MAX_SHEETS = 3
 
@@ -41,6 +46,10 @@ internal enum class PageSide {
     /** Rechte Seite: noch zu lesende Blätter rechts, Bundsteg links. */
     RIGHT,
 }
+
+/** Platz außen (und oben/unten) für Einband und Buchblock, wenn ein aufgeschlagenes Buch daliegt. */
+internal val BookOuterMargin = 18.dp
+internal val BookVerticalMargin = 18.dp
 
 /** Rechteck, das um [inset] kleiner ist: Schatten und Grund unter ausgefransten Kanten. */
 private class InsetRectangle(private val inset: Dp) : Shape {
@@ -59,6 +68,9 @@ private class InsetRectangle(private val inset: Dp) : Shape {
  * - [dim]: Abdunkeln, solange die Seite noch von der umgeblätterten Seite bedeckt ist (0..1)
  * - [aged]: Die Seite ist auf altes Papier mit ausgefransten Kanten gedruckt. Schatten und Grund
  *   liegen dann etwas innen, damit die Ausfransung sichtbar bleibt.
+ * - [side] links oder rechts: Die Seite liegt in einem aufgeschlagenen Buch. Darunter sind der
+ *   Buchblock und der Ledereinband zu sehen, am Bundsteg ist die Seite bündig, damit sich linke
+ *   und rechte Seite beim Weitergleiten zu einem Buch zusammenfügen.
  */
 @Composable
 internal fun Paper(
@@ -72,7 +84,13 @@ internal fun Paper(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = LocalReaderColors.current
-    val spineAlpha = if (darkPaper) 0.35f else 0.13f
+    val book = side != PageSide.SINGLE
+    val spineAlpha = when {
+        book && darkPaper -> 0.5f
+        book -> 0.3f
+        darkPaper -> 0.35f
+        else -> 0.13f
+    }
     val leftSheets = if (side == PageSide.RIGHT) 0 else ceil(MAX_SHEETS * readFraction).toInt().coerceIn(0, MAX_SHEETS)
     val rightSheets = if (side == PageSide.LEFT) 0 else ceil(MAX_SHEETS * (1f - readFraction)).toInt().coerceIn(0, MAX_SHEETS)
     val ground: Shape = if (aged) InsetRectangle(FrayDepth) else RectangleShape
@@ -82,15 +100,27 @@ internal fun Paper(
     Box(
         modifier
             .drawBehind {
-                // Bei ausgefransten Kanten oben und unten nicht hervorschauen lassen.
-                drawSheetEdges(colors, leftSheets, rightSheets, if (aged) FrayDepth.toPx() else 0f)
+                if (book) {
+                    // Linke Seiten: gelesene Blätter darunter; rechte Seiten: die noch zu lesenden.
+                    val fraction = if (side == PageSide.LEFT) readFraction else 1f - readFraction
+                    drawOpenBook(colors, spineRight = side == PageSide.LEFT, fraction = fraction, dark = darkPaper)
+                } else {
+                    // Bei ausgefransten Kanten oben und unten nicht hervorschauen lassen.
+                    drawSheetEdges(colors, leftSheets, rightSheets, if (aged) FrayDepth.toPx() else 0f)
+                }
             }
             .shadow(3.dp, ground, clip = !aged)
             .graphicsLayer { if (aged) compositingStrategy = CompositingStrategy.Offscreen }
             .background(paperColor, ground)
             .drawWithContent {
                 drawContent()
-                drawSpineShade(colors.shade, spineAlpha, onRight = side == PageSide.LEFT, blendMode = overlay)
+                drawSpineShade(
+                    colors.shade,
+                    spineAlpha,
+                    onRight = side == PageSide.LEFT,
+                    widthFraction = if (book) 0.075f else 0.045f,
+                    blendMode = overlay,
+                )
                 val d = dim()
                 if (d > 0f) drawRect(colors.shade, alpha = 0.22f * d, blendMode = overlay)
             },
@@ -119,8 +149,90 @@ private fun DrawScope.drawSheetEdges(colors: ReaderColors, left: Int, right: Int
     for (i in left downTo 1) sheet(i, direction = -1f)
 }
 
-private fun DrawScope.drawSpineShade(shade: Color, alpha: Float, onRight: Boolean, blendMode: BlendMode) {
-    val width = size.width * 0.045f
+/**
+ * Das aufgeschlagene Buch unter einer Seite: Schatten auf dem Tisch, Ledereinband und der
+ * Buchblock aus übereinanderliegenden Blättern. Außen, oben und unten steht beides über die
+ * Seite hinaus, am Bundsteg schließt es bündig ab (dort liegt die andere Buchhälfte).
+ *
+ * @param fraction Anteil der Blätter auf dieser Seite des Buchs (0..1)
+ */
+private fun DrawScope.drawOpenBook(colors: ReaderColors, spineRight: Boolean, fraction: Float, dark: Boolean) {
+    val w = size.width
+    val h = size.height
+    val step = 1.4.dp.toPx()
+    val layers = (2 + (5 * fraction).roundToInt()).coerceIn(2, 7)
+    val overhang = 5.dp.toPx()
+    val cover = layers * step + overhang
+    val far = 10_000f
+
+    /** Fläche, die außen, oben und unten um [grow] über die Seite hinausgeht. */
+    fun outer(grow: Float): Rect =
+        if (spineRight) Rect(-grow, -grow, w, h + grow) else Rect(0f, -grow, w + grow, h + grow)
+
+    clipRect(left = if (spineRight) -far else 0f, top = -far, right = if (spineRight) w else far, bottom = far) {
+        // Weicher Schatten des Buchs auf dem Tisch.
+        val shadowStep = 1.6.dp.toPx()
+        for (i in 7 downTo 1) {
+            val r = outer(cover + i * shadowStep)
+            drawRoundRect(
+                Color.Black.copy(alpha = 0.07f),
+                topLeft = r.topLeft + Offset(0f, 1.5.dp.toPx()),
+                size = r.size,
+                cornerRadius = CornerRadius(6.dp.toPx() + i * shadowStep),
+            )
+        }
+        // Einband aus grünem Leder, außen abgerundet; am Bundsteg über den Rand hinaus, damit
+        // dort keine Rundung zu sehen ist.
+        val c = outer(cover)
+        val extra = 24.dp.toPx()
+        val binding = if (spineRight) Rect(c.left, c.top, c.right + extra, c.bottom) else Rect(c.left - extra, c.top, c.right, c.bottom)
+        val leather = if (dark) {
+            listOf(Color(0xFF1C3320), Color(0xFF122216))
+        } else {
+            listOf(Color(0xFF34593A), Color(0xFF1E3823))
+        }
+        drawRoundRect(
+            Brush.linearGradient(leather, start = binding.topLeft, end = binding.bottomRight),
+            topLeft = binding.topLeft,
+            size = binding.size,
+            cornerRadius = CornerRadius(4.dp.toPx()),
+        )
+        drawRect(Textures.grainBrush, topLeft = binding.topLeft, size = binding.size, alpha = 0.9f)
+        // Feine Goldlinie entlang der Einbandkante.
+        val gold = if (dark) Color(0xFF8C7445) else Color(0xFFC9A55A)
+        val g = outer(cover - 2.dp.toPx())
+        drawRoundRect(
+            gold.copy(alpha = 0.55f),
+            topLeft = if (spineRight) g.topLeft else Offset(g.left - extra, g.top),
+            size = Size(g.width + extra, g.height),
+            cornerRadius = CornerRadius(3.dp.toPx()),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.8.dp.toPx()),
+        )
+        // Buchblock: Blätter von außen nach innen, jedes Blatt ein Stück kleiner.
+        val light = colors.paperEdge
+        val shade = lerp(colors.paperEdge, Color.Black, 0.25f)
+        for (i in layers downTo 1) {
+            val r = outer(i * step)
+            drawRect(if (i % 2 == 0) light else lerp(light, shade, 0.5f), topLeft = r.topLeft, size = r.size)
+            // Dunkle Kante jedes Blatts außen, oben und unten.
+            val line = 0.6.dp.toPx()
+            val edge = shade.copy(alpha = 0.6f)
+            drawRect(edge, topLeft = r.topLeft, size = Size(r.width, line))
+            drawRect(edge, topLeft = Offset(r.left, r.bottom - line), size = Size(r.width, line))
+            val x = if (spineRight) r.left else r.right - line
+            drawRect(edge, topLeft = Offset(x, r.top), size = Size(line, r.height))
+        }
+    }
+}
+
+private fun DrawScope.drawSpineShade(
+    shade: Color,
+    alpha: Float,
+    onRight: Boolean,
+    widthFraction: Float,
+    blendMode: BlendMode,
+) {
+    val width = size.width * widthFraction
     val start = if (onRight) size.width else 0f
     val end = if (onRight) size.width - width else width
     drawRect(

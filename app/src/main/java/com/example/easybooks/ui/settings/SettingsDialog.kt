@@ -19,10 +19,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.example.easybooks.R
-import com.example.easybooks.data.AppFont
 import com.example.easybooks.data.AppSettings
-import com.example.easybooks.data.PageTurn
-import com.example.easybooks.data.PaperStyle
+import com.example.easybooks.data.ReadingView
 import com.example.easybooks.data.ThemeMode
 import com.example.easybooks.data.ZoomMode
 import com.example.easybooks.ui.theme.DialogConfirmButton
@@ -37,10 +35,8 @@ fun SettingsDialog(
     settings: AppSettings,
     onThemeChange: (ThemeMode) -> Unit,
     onPageSizeChange: (ZoomMode) -> Unit,
-    onPageTurnChange: (PageTurn) -> Unit,
+    onViewChange: (ReadingView) -> Unit,
     onPageTurnSoundChange: (Boolean) -> Unit,
-    onAppFontChange: (AppFont) -> Unit,
-    onPaperChange: (PaperStyle) -> Unit,
     onChooseLibraryFolder: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -79,32 +75,19 @@ fun SettingsDialog(
                 onSelect = onThemeChange,
             )
 
-            SectionTitle(stringResource(R.string.settings_app_font))
+            SectionTitle(stringResource(R.string.settings_view))
             SegmentedPlaques(
                 options = listOf(
-                    AppFont.NORMAL to stringResource(R.string.app_font_normal),
-                    AppFont.DECORATED to stringResource(R.string.app_font_decorated),
+                    ReadingView.SLIDESHOW to stringResource(R.string.view_slideshow),
+                    ReadingView.OLD_BOOK to stringResource(R.string.view_old_book),
                 ),
-                selected = settings.appFont,
-                onSelect = onAppFontChange,
+                selected = settings.view,
+                onSelect = onViewChange,
             )
             Hint(
                 stringResource(
-                    if (settings.appFont == AppFont.DECORATED) R.string.app_font_decorated_hint else R.string.app_font_normal_hint
+                    if (settings.view == ReadingView.OLD_BOOK) R.string.view_old_book_hint else R.string.view_slideshow_hint
                 )
-            )
-
-            SectionTitle(stringResource(R.string.settings_paper))
-            SegmentedPlaques(
-                options = listOf(
-                    PaperStyle.PLAIN to stringResource(R.string.paper_plain),
-                    PaperStyle.AGED to stringResource(R.string.paper_aged),
-                ),
-                selected = settings.paper,
-                onSelect = onPaperChange,
-            )
-            Hint(
-                stringResource(if (settings.paper == PaperStyle.AGED) R.string.paper_aged_hint else R.string.paper_plain_hint)
             )
 
             SectionTitle(stringResource(R.string.settings_page_size))
@@ -124,21 +107,6 @@ fun SettingsDialog(
                         ZoomMode.NORMAL -> R.string.zoom_normal_hint
                         ZoomMode.CLOSE -> R.string.zoom_close_hint
                     }
-                )
-            )
-
-            SectionTitle(stringResource(R.string.settings_page_turn))
-            SegmentedPlaques(
-                options = listOf(
-                    PageTurn.CURL to stringResource(R.string.page_turn_curl),
-                    PageTurn.SLIDE to stringResource(R.string.page_turn_slide),
-                ),
-                selected = settings.pageTurn,
-                onSelect = onPageTurnChange,
-            )
-            Hint(
-                stringResource(
-                    if (settings.pageTurn == PageTurn.CURL) R.string.page_turn_curl_hint else R.string.page_turn_slide_hint
                 )
             )
 

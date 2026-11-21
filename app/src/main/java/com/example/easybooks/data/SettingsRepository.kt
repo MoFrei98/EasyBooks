@@ -11,28 +11,22 @@ import kotlinx.coroutines.flow.map
 /** Helles oder dunkles Design. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-/** Schrift der App-Oberfläche. Die Schrift in den Büchern ändert sich nie. */
-enum class AppFont {
-    /** Systemschrift. */
-    NORMAL,
+/** Wie die Bücher im Reader aussehen und blättern. */
+enum class ReadingView {
+    /** Helles Papier, die Seiten gleiten zur Seite. */
+    SLIDESHOW,
 
-    /** Alte Buchschriften: Tangerine für Titel, IM Fell English und Alegreya für den Rest. */
-    DECORATED,
-}
-
-/** Papier der Buchseiten im Reader. */
-enum class PaperStyle {
-    /** Vergilbtes, altes Papier mit brauner Tinte. */
-    AGED,
-
-    /** Helles Papier wie bisher. */
-    PLAIN,
+    /**
+     * Ein aufgeschlagenes Buch auf dem Tisch: altes Papier mit ausgefransten Kanten. Rechte
+     * Seiten werden umgeblättert, von der linken zur rechten Seite gleitet der Blick weiter.
+     */
+    OLD_BOOK,
 }
 
 /** Reihenfolge der Bücher in der Bibliothek. */
 enum class LibrarySort { RECENT, TITLE }
 
-/** Wie die Seiten beim Blättern animiert werden. */
+/** Wie die Seiten beim Blättern animiert werden (folgt aus der [ReadingView]). */
 enum class PageTurn {
     /** Die obere Seite gleitet weg und gibt die darunterliegende frei (wie im Buch). */
     CURL,
@@ -45,7 +39,7 @@ data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     /** Seitenausschnitt im Reader, gilt für alle Bücher. */
     val pageSize: ZoomMode = ZoomMode.NORMAL,
-    val pageTurn: PageTurn = PageTurn.CURL,
+    val view: ReadingView = ReadingView.OLD_BOOK,
     /** Papiergeräusch beim Umblättern. */
     val pageTurnSound: Boolean = false,
     /** Bibliotheksordner auf dem Gerät (Tree-URI) oder `null`, solange keiner gewählt ist. */
@@ -54,13 +48,20 @@ data class AppSettings(
     val libraryLabel: String? = null,
     val sort: LibrarySort = LibrarySort.RECENT,
     val filter: BookFilter = BookFilter.ALL,
-    val appFont: AppFont = AppFont.DECORATED,
-    val paper: PaperStyle = PaperStyle.AGED,
-)
+) {
+    /** Altes Buch: Seiten biegen sich beim Umblättern, Slideshow: sie gleiten. */
+    val pageTurn: PageTurn get() = if (view == ReadingView.OLD_BOOK) PageTurn.CURL else PageTurn.SLIDE
+
+    /** Buchseiten auf altem Papier mit ausgefransten Kanten. */
+    val agedPaper: Boolean get() = view == ReadingView.OLD_BOOK
+}
 
 class SettingsRepository(private val context: Context) {
 
     private val themeKey = stringPreferencesKey("theme")
+    private val viewKey = stringPreferencesKey("view")
+
+    /** Früher eigene Einstellung "Blättern"; nur noch zum Übernehmen einer gewählten Slideshow. */
     private val pageTurnKey = stringPreferencesKey("page_turn")
     private val pageTurnSoundKey = booleanPreferencesKey("page_turn_sound")
     private val pageSizeKey = stringPreferencesKey("page_size")
@@ -68,22 +69,19 @@ class SettingsRepository(private val context: Context) {
     private val libraryLabelKey = stringPreferencesKey("library_label")
     private val sortKey = stringPreferencesKey("sort")
     private val filterKey = stringPreferencesKey("filter")
-    private val appFontKey = stringPreferencesKey("app_font")
-    private val paperKey = stringPreferencesKey("paper")
 
     val settings: Flow<AppSettings> = context.easyBooksDataStore.data
         .map { prefs ->
             AppSettings(
                 theme = enumOrDefault(prefs[themeKey], ThemeMode.SYSTEM),
                 pageSize = ZoomMode.fromStored(prefs[pageSizeKey]),
-                pageTurn = enumOrDefault(prefs[pageTurnKey], PageTurn.CURL),
+                view = prefs[viewKey]?.let { enumOrDefault(it, ReadingView.OLD_BOOK) }
+                    ?: if (prefs[pageTurnKey] == "SLIDE") ReadingView.SLIDESHOW else ReadingView.OLD_BOOK,
                 pageTurnSound = prefs[pageTurnSoundKey] ?: false,
                 libraryTree = prefs[libraryTreeKey],
                 libraryLabel = prefs[libraryLabelKey],
                 sort = enumOrDefault(prefs[sortKey], LibrarySort.RECENT),
                 filter = enumOrDefault(prefs[filterKey], BookFilter.ALL),
-                appFont = enumOrDefault(prefs[appFontKey], AppFont.DECORATED),
-                paper = enumOrDefault(prefs[paperKey], PaperStyle.AGED),
             )
         }
         .distinctUntilChanged()
@@ -96,8 +94,8 @@ class SettingsRepository(private val context: Context) {
         context.easyBooksDataStore.edit { it[pageSizeKey] = value.name }
     }
 
-    suspend fun setPageTurn(value: PageTurn) {
-        context.easyBooksDataStore.edit { it[pageTurnKey] = value.name }
+    suspend fun setView(value: ReadingView) {
+        context.easyBooksDataStore.edit { it[viewKey] = value.name }
     }
 
     suspend fun setPageTurnSound(value: Boolean) {
@@ -113,14 +111,6 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setFilter(value: BookFilter) {
         context.easyBooksDataStore.edit { it[filterKey] = value.name }
-    }
-
-    suspend fun setAppFont(value: AppFont) {
-        context.easyBooksDataStore.edit { it[appFontKey] = value.name }
-    }
-
-    suspend fun setPaper(value: PaperStyle) {
-        context.easyBooksDataStore.edit { it[paperKey] = value.name }
     }
 
     suspend fun setSort(value: LibrarySort) {

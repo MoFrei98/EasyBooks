@@ -38,7 +38,7 @@
 
 ## Features
 
-- **Looks like an old library** (Android): folders are wooden shelves, books are bound in leather with brass corners, and the pages look like aged paper with slightly frayed edges. You read like in an open book: from a left page to the right one your eyes just move on, and only after a right page you turn the leaf. Prefer it plain? Set *Papier* to *Standard* and *Schrift der App* to *Normal* in the settings. The iPhone app keeps its plain look.
+- **Looks like an old library** (Android): folders are wooden shelves and books are bound in leather with brass corners. In the view *Altes Buch* (old book, the default) an open book lies on the table: aged paper with slightly frayed edges, from a left page to the right one your eyes just move on, and only after a right page you turn the leaf. Prefer it plain? Choose the view *Slideshow*. The iPhone app keeps its plain look.
 - **Pages that turn like paper**, with an optional soft rustle – or a simple slideshow if you prefer.
 - **Three text sizes, nothing cut off.** *Klein* shows the whole page, *Normal* trims the white margins, and *Groß* reflows the text in large print like an e-book – even for scanned books.
 - **Your own folders.** Easy Books shows the PDFs in a folder on your device, with subfolders as shelves. Sorting a book into a folder moves the file.
@@ -85,7 +85,7 @@ Easy Books is not in the App Store. Apple only lets an iPhone run apps that are 
 
 **iPhone:** nothing to set up. Your library is the folder **On My iPhone › Easy Books** in the Files app. Put PDFs there, or open a PDF in another app and choose **Share → Easy Books**.
 
-**Reading:** swipe or tap the right or left edge to turn the page. Tap the middle to show the toolbars, use the slider to jump to any page. Text size, design (light/dark), page-turn style and, on Android, app font and paper are in the settings (gear icon).
+**Reading:** swipe or tap the right or left edge to turn the page. Tap the middle to show the toolbars, use the slider to jump to any page. Text size, design (light/dark) and the view (on Android *Slideshow* or *Altes Buch*) are in the settings (gear icon).
 
 ## Privacy
 

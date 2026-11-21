@@ -79,7 +79,8 @@ internal fun PageView(
     onTap: (x: Float, width: Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PageBox(page, pageTurn, spread, pageOffset, onTap, modifier) {
+    val side = pageSide(page, spread)
+    PageBox(page, pageTurn, spread, side, pageOffset, onTap, modifier) {
         val pageSize by produceState<Size?>(null, page) { value = vm.pageSize(page) }
         val crop = rememberResult(page, zoom) {
             when (zoom) {
@@ -97,9 +98,11 @@ internal fun PageView(
         // Seitenverhältnis des sichtbaren Ausschnitts.
         val aspect = (pdfSize.height * crop.height) / (pdfSize.width * crop.width)
         // Ohne Ränder zählt jeder Millimeter, dort ist der Abstand zum Bildschirmrand schmaler.
+        // Im aufgeschlagenen Buch liegt die Seite am Bundsteg bündig, außen sind Einband und Buchblock.
         val hPadding = if (zoom == ZoomMode.WIDE) PageHPadding else PageHPaddingClose
-        val availableWidth = maxWidth - hPadding * 2
-        val availableHeight = maxHeight - PageVPadding * 2
+        val vPadding = if (side == PageSide.SINGLE) PageVPadding else BookVerticalMargin
+        val availableWidth = if (side == PageSide.SINGLE) maxWidth - hPadding * 2 else maxWidth - BookOuterMargin
+        val availableHeight = maxHeight - vPadding * 2
         val width = when (zoom) {
             ZoomMode.WIDE -> minOf(availableWidth, availableHeight / aspect)
             ZoomMode.NORMAL, ZoomMode.CLOSE -> availableWidth
@@ -117,10 +120,14 @@ internal fun PageView(
             val raw = vm.renderPage(page, widthPx, crop)
             if (aged && imagePage != null) {
                 withContext(Dispatchers.Default) {
-                    AgedPaper.print(raw, seed = page, dark = darkPages, picture = imagePage, fray = fray, unit = density.density)
+                    AgedPaper.print(
+                        raw, seed = page, dark = darkPages, picture = imagePage, fray = fray,
+                        unit = density.density, bound = side.boundEdge,
+                    )
                 }
             } else raw
         }
+        val back = rememberBack(bitmap, aged && pageTurn == PageTurn.CURL, darkPages)
 
         Sheet(
             page = page,
@@ -131,10 +138,13 @@ internal fun PageView(
             readFraction = if (pageCount > 1) page / (pageCount - 1f) else 0f,
             pageTurn = pageTurn,
             spread = spread,
+            side = side,
+            back = back,
             darkPages = darkPages,
             pageOffset = pageOffset,
             grabRootY = grabRootY,
             scrollable = scrollable,
+            vPadding = vPadding,
         )
     }
 }
@@ -156,7 +166,8 @@ internal fun ReflowPageView(
     onTap: (x: Float, width: Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PageBox(index, pageTurn, spread, pageOffset, onTap, modifier) {
+    val side = pageSide(index, spread)
+    PageBox(index, pageTurn, spread, side, pageOffset, onTap, modifier) {
         val frame = layout.params.frame
         val density = LocalDensity.current
         val fray = with(density) { FrayDepth.toPx() }
@@ -169,11 +180,12 @@ internal fun ReflowPageView(
                 withContext(Dispatchers.Default) {
                     AgedPaper.print(
                         raw, seed = REFLOW_SEED + index, dark = darkPages, picture = imageOnly,
-                        fray = fray, unit = density.density,
+                        fray = fray, unit = density.density, bound = side.boundEdge,
                     )
                 }
             } else raw
         }
+        val back = rememberBack(bitmap, aged && pageTurn == PageTurn.CURL, darkPages)
         // Ganzseitige Bilder (z. B. Cover) liegen auf einem Blatt in ihrer eigenen Größe.
         val image = screenPage?.placements?.singleOrNull()?.takeIf { imageOnly }
         val count = layout.estimatedCount
@@ -186,10 +198,13 @@ internal fun ReflowPageView(
             readFraction = if (count > 1) (index / (count - 1f)).coerceAtMost(1f) else 0f,
             pageTurn = pageTurn,
             spread = spread,
+            side = side,
+            back = back,
             darkPages = darkPages,
             pageOffset = pageOffset,
             grabRootY = grabRootY,
             scrollable = false,
+            vPadding = PageVPadding,
         )
     }
 }
@@ -200,6 +215,7 @@ private fun PageBox(
     page: Int,
     pageTurn: PageTurn,
     spread: Boolean,
+    side: PageSide,
     pageOffset: () -> Float,
     onTap: (x: Float, width: Float) -> Unit,
     modifier: Modifier,
@@ -215,7 +231,12 @@ private fun PageBox(
                 detectTapGestures { offset -> currentOnTap(offset.x, size.width.toFloat()) }
             }
             .windowInsetsPadding(WindowInsets.displayCutout),
-        contentAlignment = Alignment.Center,
+        // Im aufgeschlagenen Buch liegt jede Seite am Bundsteg: rechte Seiten links, linke rechts.
+        contentAlignment = when (side) {
+            PageSide.SINGLE -> Alignment.Center
+            PageSide.RIGHT -> Alignment.CenterStart
+            PageSide.LEFT -> Alignment.CenterEnd
+        },
         content = content,
     )
 }
@@ -235,10 +256,13 @@ private fun Sheet(
     readFraction: Float,
     pageTurn: PageTurn,
     spread: Boolean,
+    side: PageSide,
+    back: ImageBitmap?,
     darkPages: Boolean,
     pageOffset: () -> Float,
     grabRootY: () -> Float,
     scrollable: Boolean,
+    vPadding: Dp,
 ) {
     val curl = pageTurn == PageTurn.CURL
     val readerColors = LocalReaderColors.current
@@ -282,6 +306,7 @@ private fun Sheet(
                     colorFilter = colorFilter,
                     paperColor = paperColor,
                     shadowColor = shadowColor,
+                    backBitmap = back,
                 )
             }
         } else Paper(
@@ -294,11 +319,7 @@ private fun Sheet(
                 if (curl && curlsAfter(page - 1, spread) && offset < 0f && offset > -1f) -offset else 0f
             },
             aged = readerColors.aged,
-            side = when {
-                !spread -> PageSide.SINGLE
-                page % 2 == 0 -> PageSide.RIGHT
-                else -> PageSide.LEFT
-            },
+            side = side,
             modifier = Modifier.size(width, height),
         ) {
             if (bitmap != null && imagePage != null) {
@@ -318,8 +339,12 @@ private fun Sheet(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = PageVPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(vertical = vPadding),
+            horizontalAlignment = when (side) {
+                PageSide.SINGLE -> Alignment.CenterHorizontally
+                PageSide.RIGHT -> Alignment.Start
+                PageSide.LEFT -> Alignment.End
+            },
         ) { paper() }
     } else {
         paper()
@@ -336,6 +361,28 @@ private fun <T> rememberResult(vararg keys: Any?, load: suspend () -> T): T? {
     val result by produceState<Pair<List<Any?>, T>?>(null, *keys) { value = keyList to load() }
     return result?.takeIf { it.first == keyList }?.second
 }
+
+/** Lage der Seite: im aufgeschlagenen Buch liegt Seite 1 (Index 0) rechts. */
+internal fun pageSide(page: Int, spread: Boolean): PageSide = when {
+    !spread -> PageSide.SINGLE
+    page.mod(2) == 0 -> PageSide.RIGHT
+    else -> PageSide.LEFT
+}
+
+/** Kante am Bundsteg (gebunden, nicht ausgefranst): 3 = links, 1 = rechts, -1 = keine. */
+private val PageSide.boundEdge: Int
+    get() = when (this) {
+        PageSide.SINGLE -> -1
+        PageSide.RIGHT -> 3
+        PageSide.LEFT -> 1
+    }
+
+/** Rückseite des Blatts für das Umblättern (altes Papier, ausgefranst, Schrift scheint durch). */
+@Composable
+private fun rememberBack(front: ImageBitmap?, enabled: Boolean, dark: Boolean): ImageBitmap? =
+    if (enabled && front != null) {
+        rememberResult(front, dark) { withContext(Dispatchers.Default) { AgedPaper.back(front, dark) } }
+    } else null
 
 /**
  * Wird nach Seite [page] umgeblättert (sonst gleiten die Seiten wie in der Slideshow)?

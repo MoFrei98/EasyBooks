@@ -73,7 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.easybooks.R
 import com.example.easybooks.data.AppSettings
-import com.example.easybooks.data.PaperStyle
+import com.example.easybooks.data.ReadingView
 import com.example.easybooks.data.PageTurn
 import com.example.easybooks.data.ZoomMode
 import com.example.easybooks.reflow.ReflowFrame
@@ -191,11 +191,13 @@ private fun ReflowReader(
         val density = LocalDensity.current
         val direction = LocalLayoutDirection.current
         val cutout = WindowInsets.displayCutout.asPaddingValues()
+        // Im aufgeschlagenen Buch braucht es außen, oben und unten Platz für Einband und Buchblock.
+        val book = settings.spread
         val params = with(density) {
             val width = maxWidth - cutout.calculateLeftPadding(direction) -
-                cutout.calculateRightPadding(direction) - PageHPaddingClose * 2
+                cutout.calculateRightPadding(direction) - (if (book) BookOuterMargin else PageHPaddingClose * 2)
             val height = maxHeight - cutout.calculateTopPadding() - cutout.calculateBottomPadding() -
-                ReflowVPadding * 2
+                (if (book) BookVerticalMargin else ReflowVPadding) * 2
             ReflowParams(
                 frame = ReflowFrame(
                     width = width.roundToPx(),
@@ -590,8 +592,8 @@ private const val TAP_TURN_BOOK_MS = 1000
 private const val TAP_TURN_SLIDE_MS = 450
 
 /**
- * Lesen wie in einem aufgeschlagenen Buch: auf altem Papier mit Buchseiten. Dann liegen
- * immer eine linke und eine rechte Seite nebeneinander (siehe [curlsAfter]).
+ * Lesen wie in einem aufgeschlagenen Buch (Ansicht "Altes Buch"): Dann liegen immer eine
+ * linke und eine rechte Seite nebeneinander (siehe [curlsAfter]).
  */
 private val AppSettings.spread: Boolean
-    get() = pageTurn == PageTurn.CURL && paper == PaperStyle.AGED
+    get() = view == ReadingView.OLD_BOOK

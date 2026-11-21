@@ -46,8 +46,18 @@ internal object AgedPaper {
     /**
      * @param fray größte Tiefe der Ausfransung in Pixeln ([FrayDepth])
      * @param unit Pixel pro dp, damit die Fasern auf jedem Bildschirm gleich groß wirken
+     * @param bound Kante am Bundsteg, die gebunden und daher nicht ausgefranst ist
+     *   (0 oben, 1 rechts, 2 unten, 3 links, -1 keine)
      */
-    fun print(page: ImageBitmap, seed: Int, dark: Boolean, picture: Boolean, fray: Float, unit: Float): ImageBitmap {
+    fun print(
+        page: ImageBitmap,
+        seed: Int,
+        dark: Boolean,
+        picture: Boolean,
+        fray: Float,
+        unit: Float,
+        bound: Int = -1,
+    ): ImageBitmap {
         val src = page.asAndroidBitmap()
         val width = src.width
         val height = src.height
@@ -84,12 +94,29 @@ internal object AgedPaper {
             }
         }
         drawEdges(canvas, width, height, dark)
-        if (fray > 0f) frayEdges(out, seed, fray, unit)
+        if (fray > 0f) frayEdges(out, seed, fray, unit, bound)
+        return out.asImageBitmap()
+    }
+
+    /**
+     * Rückseite eines Blatts für das Umblättern: dasselbe Papier mit denselben ausgefransten
+     * Kanten, die Schrift der Vorderseite scheint nur schwach durch.
+     */
+    fun back(front: ImageBitmap, dark: Boolean): ImageBitmap {
+        val src = front.asAndroidBitmap()
+        val out = src.copy(Bitmap.Config.ARGB_8888, true)
+        val paper = if (dark) AgedDarkReaderColors.paper else AgedLightReaderColors.paper
+        // "Oben drauf" behält die Deckkraft (und damit die Fransen) der Vorderseite.
+        Canvas(out).drawRect(0f, 0f, out.width.toFloat(), out.height.toFloat(), Paint().apply {
+            color = paper.toArgb()
+            alpha = 240
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
+        })
         return out.asImageBitmap()
     }
 
     /** Macht die Kanten unregelmäßig durchsichtig und färbt den Riss etwas dunkler. */
-    private fun frayEdges(bitmap: Bitmap, seed: Int, fray: Float, unit: Float) {
+    private fun frayEdges(bitmap: Bitmap, seed: Int, fray: Float, unit: Float, bound: Int) {
         val w = bitmap.width
         val h = bitmap.height
         // Streifen, in dem gerechnet wird: Ausfransung plus vergilbter Saum dahinter.
@@ -115,10 +142,10 @@ internal object AgedPaper {
                     alpha *= smoothstep(depth - 0.6f, depth + 0.6f, distance)
                     tint = minOf(tint, 1f - 0.22f * (1f - smoothstep(depth, depth + seam, distance)))
                 }
-                edge(y + 0.5f, top[x])
-                edge(h - y - 0.5f, bottom[x])
-                edge(x + 0.5f, left[y])
-                edge(w - x - 0.5f, right[y])
+                if (bound != 0) edge(y + 0.5f, top[x])
+                if (bound != 2) edge(h - y - 0.5f, bottom[x])
+                if (bound != 3) edge(x + 0.5f, left[y])
+                if (bound != 1) edge(w - x - 0.5f, right[y])
                 if (alpha >= 1f && tint >= 1f) continue
                 val c = px[yy * rw + xx]
                 val a = (alpha * 255f).toInt().coerceIn(0, 255)

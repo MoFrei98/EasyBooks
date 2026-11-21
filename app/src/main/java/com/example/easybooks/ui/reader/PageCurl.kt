@@ -153,6 +153,7 @@ internal fun DrawScope.drawCurledPage(
     colorFilter: ColorFilter?,
     paperColor: Color,
     shadowColor: Color,
+    backBitmap: ImageBitmap? = null,
 ) {
     val p = progress.coerceIn(0f, 1f)
     val mesh = PageCurl.project(size.width, size.height, p, grab, visibleTop, visibleBottom)
@@ -198,7 +199,10 @@ internal fun DrawScope.drawCurledPage(
             canvas.drawBitmapMesh(bitmap.asAndroidBitmap(), cols, rows, verts, 0, colors, 0, meshPaint)
         }
 
-        // 3. Rückseite (und Vorderseite, solange noch kein Bild da ist) als Papier.
+        // 3. Rückseite (und Vorderseite, solange noch kein Bild da ist) als Papier. Bei altem
+        //    Papier liegt eine eigene Rückseite als Textur darauf, mit denselben Fransen.
+        val textured = backBitmap != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        val back = if (textured) TexturedTriangles(backBitmap!!.asAndroidBitmap()) else null
         val paper = Triangles()
         for (row in 0 until rows) {
             for (col in 0 until cols) {
@@ -212,6 +216,15 @@ internal fun DrawScope.drawCurledPage(
                     val light = if (backSide) PageCurl.backLight(mesh.angle[i]) else PageCurl.frontLight(mesh.angle[i])
                     return paperColor.shaded(light).toArgb()
                 }
+                if (backSide && back != null) {
+                    fun light(i: Int): Int = Color.White.shaded(PageCurl.backLight(mesh.angle[i])).toArgb()
+                    back.quad(
+                        mesh, cols, rows,
+                        intArrayOf(col, col + 1, col + 1, col), intArrayOf(row, row, row + 1, row + 1),
+                        intArrayOf(a, b, c, d).map { light(it) }.toIntArray(),
+                    )
+                    continue
+                }
                 paper.quad(
                     mesh.x[a], mesh.y[a], shade(a), mesh.x[b], mesh.y[b], shade(b),
                     mesh.x[c], mesh.y[c], shade(c), mesh.x[d], mesh.y[d], shade(d),
@@ -219,9 +232,12 @@ internal fun DrawScope.drawCurledPage(
             }
         }
         paper.draw(canvas)
+        back?.draw(canvas)
     }
 
-    // 4. Feine Kante am freien Rand, damit sich die Seite vom Hintergrund abhebt.
+    // 4. Feine Kante am freien Rand, damit sich die Seite vom Hintergrund abhebt
+    //    (bei ausgefranstem Papier nicht: Die Fransen sind die Kante).
+    if (backBitmap != null) return
     val edge = Path()
     for (row in 0..rows) {
         val i = mesh.index(cols, row)
@@ -249,6 +265,42 @@ private fun signedArea(mesh: PageCurl.Mesh, vararg corners: Int): Float {
 }
 
 private fun Color.shaded(light: Float) = Color(red * light, green * light, blue * light, alpha)
+
+/**
+ * Dreiecke mit einer Textur (Rückseite des Blatts), je Eckpunkt schattiert. Nur ab Android 10.
+ */
+private class TexturedTriangles(private val texture: android.graphics.Bitmap) {
+    private val points = ArrayList<Float>()
+    private val texs = ArrayList<Float>()
+    private val colors = ArrayList<Int>()
+
+    /** Zelle (Spalten [cs], Zeilen [rs] je Ecke) mit den Gitterpunkten in [mesh]. */
+    fun quad(mesh: PageCurl.Mesh, cols: Int, rows: Int, cs: IntArray, rs: IntArray, light: IntArray) {
+        fun add(k: Int) {
+            val i = mesh.index(cs[k], rs[k])
+            points += mesh.x[i]
+            points += mesh.y[i]
+            texs += cs[k] / cols.toFloat() * texture.width
+            texs += rs[k] / rows.toFloat() * texture.height
+            colors += light[k]
+        }
+        add(0); add(1); add(2)
+        add(0); add(2); add(3)
+    }
+
+    fun draw(canvas: Canvas) {
+        if (colors.isEmpty()) return
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            shader = android.graphics.BitmapShader(
+                texture, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawVertices(
+            Canvas.VertexMode.TRIANGLES, points.size, points.toFloatArray(), 0,
+            texs.toFloatArray(), 0, colors.toIntArray(), 0, null, 0, 0, paint,
+        )
+    }
+}
 
 /**
  * Sammelt Dreiecke mit Farben je Eckpunkt und zeichnet sie in einem Rutsch.
