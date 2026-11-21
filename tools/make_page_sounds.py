@@ -12,7 +12,8 @@ Ein Papier-Rascheln besteht hier aus zwei Teilen:
 Bewusst ohne dumpfen Ton am Ende: Der klang wie ein zugeschlagenes Hardcover-Buch.
 
 Genau den gibt es dafür beim Buchdeckel (cover_open.wav, Ansicht "Altes Buch"):
-Leder knarzt im Falz, der Deckel streicht durch die Luft und liegt dumpf auf.
+Der Deckel streicht leise durch die Luft und liegt dumpf auf. (Ein Knarzen im
+Falz vorweg klang eher nach etwas anderem und ist wieder raus.)
 """
 import os
 import wave
@@ -72,20 +73,6 @@ def hardcover(seed, length=1.05):
     n = int(RATE * length)
     t = np.arange(n) / RATE
 
-    # Knarzen im Falz: Haft-Gleit-Impulse mit schwankender Rate, mittig gefiltert.
-    creak = np.zeros(n)
-    pos = int(RATE * 0.02)
-    end_creak = int(RATE * 0.48)
-    while pos < end_creak:
-        progress = pos / end_creak
-        rate = 70 + 90 * np.sin(np.pi * progress) + rng.uniform(-15, 15)
-        width = rng.integers(25, 60)
-        stop = min(n, pos + width)
-        decay = np.exp(-np.arange(stop - pos) / rng.uniform(5, 12))
-        creak[pos:stop] += rng.uniform(0.5, 1.0) * np.sin(np.pi * progress) ** 0.6 * decay
-        pos += int(RATE / rate)
-    creak = bandpass(creak, 350, 2600)
-
     # Luftzug: tiefes, weiches Rauschen, das anschwillt, solange der Deckel schwingt.
     whoosh = bandpass(rng.standard_normal(n), 180, 1600)
     whoosh *= envelope(n, 1.6, 0.55, 3.0)
@@ -100,7 +87,9 @@ def hardcover(seed, length=1.05):
     knock = np.zeros(n)
     knock[land:] = bandpass(rng.standard_normal(n - land), 120, 900) * np.exp(-k / 0.03)
 
-    mix = 0.55 * creak / (np.abs(creak).max() + 1e-9)         + 0.35 * whoosh / (np.abs(whoosh).max() + 1e-9)         + 1.0 * thud         + 0.45 * knock / (np.abs(knock).max() + 1e-9)
+    mix = 0.3 * whoosh / (np.abs(whoosh).max() + 1e-9) \
+        + 1.0 * thud \
+        + 0.45 * knock / (np.abs(knock).max() + 1e-9)
     return mix
 
 
