@@ -10,6 +10,9 @@ The Android app lives on `main`. The iPhone app is developed on the `ios-port` b
 - **Tests:** `./gradlew testDebugUnitTest`
 - **App ID:** `com.example.ebf` stays from the time the app was called EBF. Changing it would make Android treat Easy Books as a different app, and existing installs would lose their library. The same applies to the database file `ebf.db` and the DataStore name `ebf`.
 - **Signing:** release builds are signed with the local debug key (`~/.android/debug.keystore`), see `app/build.gradle.kts`. Build releases on the same machine, otherwise the new APK can't be installed over the old one.
+- **Look ("Alte Bücherei", issue #30):** colors, textures, ornaments and shared components live in `ui/theme` (`Palette`, `Textures`, `Ornaments`, `Components`). The concept is in [docs/design/stilkonzept-alte-buecherei.pdf](design/stilkonzept-alte-buecherei.pdf). Paper, leather and wood textures are generated in code; aged book pages are printed onto procedurally generated paper in `ui/reader/AgedPaper.kt`. The iPhone app keeps its plain look.
+- **Fonts:** Tangerine, IM Fell English and Alegreya in `res/font`, all under the SIL Open Font License (texts in `docs/licenses`).
+- **App icon:** `python tools/make_icon.py` writes the adaptive icon, the monochrome icon and the splash wordmark (the letters are converted to paths from Tangerine with fontTools). `pwsh tools/render_icon.ps1` renders `docs/icon.png` with Microsoft Edge.
 
 ## iPhone (branch `ios-port`)
 
@@ -59,6 +62,8 @@ shared/                                    branch ios-port
 ├── fixtures/                test cases checked by both apps
 └── samples/                 sample books for screenshots
 tools/
+├── make_icon.py             app icon, monochrome icon and splash wordmark (fontTools)
+├── render_icon.ps1          renders docs/icon.png from the icon SVG
 ├── make_page_sounds.py      synthesizes the page-turn sounds (no third-party recordings)
 └── make_sample_books.py     generates the sample books (branch ios-port)
 ```

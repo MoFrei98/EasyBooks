@@ -156,6 +156,7 @@ fun LibraryScreen(
     val dark = LocalDarkTheme.current
     Scaffold(
         containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.parchmentBackground(dark),
         topBar = {
             if (searchOpen) {

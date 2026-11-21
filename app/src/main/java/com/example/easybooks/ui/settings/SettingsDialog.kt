@@ -97,8 +97,8 @@ fun SettingsDialog(
             SectionTitle(stringResource(R.string.settings_paper))
             SegmentedPlaques(
                 options = listOf(
-                    PaperStyle.AGED to stringResource(R.string.paper_aged),
                     PaperStyle.PLAIN to stringResource(R.string.paper_plain),
+                    PaperStyle.AGED to stringResource(R.string.paper_aged),
                 ),
                 selected = settings.paper,
                 onSelect = onPaperChange,
