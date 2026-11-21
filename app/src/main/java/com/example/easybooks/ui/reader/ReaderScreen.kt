@@ -44,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -147,9 +148,12 @@ private fun Reader(
     } else {
         // Startseite nur beim Betreten festlegen, nicht bei jedem Umblättern neu.
         val initialPage = remember { vm.position.page }
+        // Ist die erste Seite ein Bild, ist sie im alten Buch der feste Deckel (eigenes Geräusch).
+        val coverFirst by produceState(false, vm) { value = vm.isImagePage(0) }
         PagedReader(
             title = ready.title,
             settings = settings,
+            coverFirst = coverFirst,
             initialPage = initialPage,
             pageCount = ready.pageCount,
             shownCount = ready.pageCount,
@@ -225,6 +229,7 @@ private fun ReflowReader(
             PagedReader(
                 title = ready.title,
                 settings = settings,
+                coverFirst = current.pages.firstOrNull()?.imageOnly == true,
                 initialPage = start,
                 pageCount = current.pages.size,
                 shownCount = current.estimatedCount,
@@ -297,6 +302,7 @@ private fun ReflowPreparing(
 private fun PagedReader(
     title: String,
     settings: AppSettings,
+    coverFirst: Boolean,
     initialPage: Int,
     pageCount: Int,
     shownCount: Int,
@@ -347,7 +353,11 @@ private fun PagedReader(
                 abs(current - settled) == 1 && current != soundedPage[0] -> {
                     soundedPage[0] = current
                     // Von der linken zur rechten Seite gehen nur die Augen weiter: kein Rascheln.
-                    if (curlsAfter(min(current, settled), spread)) sound.play(bookPages)
+                    val transition = min(current, settled)
+                    when {
+                        spread && coverFirst && transition == 0 -> sound.playCover()
+                        curlsAfter(transition, spread) -> sound.play(bookPages)
+                    }
                 }
             }
         }
@@ -364,12 +374,21 @@ private fun PagedReader(
         soundedPage[0] = target
         // Bei Doppelseiten wird nur nach einer rechten Seite umgeblättert, sonst gleiten die Seiten.
         val turnsLeaf = bookPages && curlsAfter(min(base, target), spread)
-        if (!spread || turnsLeaf) sound?.play(bookPages)
+        // Der feste Buchdeckel klappt langsamer auf und klingt anders.
+        val opensCover = spread && coverFirst && min(base, target) == 0
+        when {
+            opensCover -> sound?.playCover()
+            !spread || turnsLeaf -> sound?.play(bookPages)
+        }
         scope.launch {
             pagerState.animateScrollToPage(
                 page = target,
                 animationSpec = tween(
-                    durationMillis = if (turnsLeaf) TAP_TURN_BOOK_MS else TAP_TURN_SLIDE_MS,
+                    durationMillis = when {
+                        opensCover -> TAP_TURN_COVER_MS
+                        turnsLeaf -> TAP_TURN_BOOK_MS
+                        else -> TAP_TURN_SLIDE_MS
+                    },
                     easing = FastOutSlowInEasing,
                 ),
             )
@@ -590,6 +609,7 @@ private val ReflowMarginBottom = 22.dp
 /** Dauer des Umblätterns beim Tippen auf den Rand. */
 private const val TAP_TURN_BOOK_MS = 1000
 private const val TAP_TURN_SLIDE_MS = 450
+private const val TAP_TURN_COVER_MS = 1000
 
 /**
  * Lesen wie in einem aufgeschlagenen Buch (Ansicht "Altes Buch"): Dann liegen immer eine

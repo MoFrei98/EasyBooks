@@ -116,18 +116,22 @@ internal fun PageView(
         val aged = LocalReaderColors.current.aged
         // Im Dark Mode und auf altem Papier erst wissen, ob es eine Bildseite ist, damit nichts aufblitzt.
         val imagePage = if (darkPages || aged) rememberResult(page, "image") { vm.isImagePage(page) } else false
-        val bitmap = rememberResult(page, widthPx, crop, aged, darkPages, imagePage) {
+        // Ansicht "Altes Buch": Ist die erste Seite ein Bild, ist sie der feste Buchdeckel.
+        val cover = side == PageSide.RIGHT && page == 0 && imagePage == true
+        val bitmap = rememberResult(page, widthPx, crop, aged, darkPages, imagePage, cover) {
             val raw = vm.renderPage(page, widthPx, crop)
-            if (aged && imagePage != null) {
-                withContext(Dispatchers.Default) {
+            when {
+                cover -> withContext(Dispatchers.Default) { HardCover.front(raw, darkPages, density.density) }
+                aged && imagePage != null -> withContext(Dispatchers.Default) {
                     AgedPaper.print(
                         raw, seed = page, dark = darkPages, picture = imagePage, fray = fray,
                         unit = density.density, bound = side.boundEdge,
                     )
                 }
-            } else raw
+                else -> raw
+            }
         }
-        val back = rememberBack(bitmap, aged && pageTurn == PageTurn.CURL, darkPages)
+        val back = if (cover) rememberInside(bitmap, darkPages) else rememberBack(bitmap, aged && pageTurn == PageTurn.CURL, darkPages)
 
         Sheet(
             page = page,
@@ -138,7 +142,7 @@ internal fun PageView(
             readFraction = if (pageCount > 1) page / (pageCount - 1f) else 0f,
             pageTurn = pageTurn,
             spread = spread,
-            side = side,
+            side = if (cover) PageSide.COVER else side,
             back = back,
             darkPages = darkPages,
             pageOffset = pageOffset,
@@ -174,18 +178,22 @@ internal fun ReflowPageView(
         val screenPage = layout.pages.getOrNull(index)
         val imageOnly = screenPage?.imageOnly == true
         val aged = LocalReaderColors.current.aged
-        val bitmap = rememberResult(layout.params, index, aged, darkPages) {
+        val cover = side == PageSide.RIGHT && index == 0 && imageOnly
+        val bitmap = rememberResult(layout.params, index, aged, darkPages, cover) {
             val raw = vm.renderReflowPage(layout, index)
-            if (aged && raw != null) {
-                withContext(Dispatchers.Default) {
+            when {
+                raw == null -> null
+                cover -> withContext(Dispatchers.Default) { HardCover.front(raw, darkPages, density.density) }
+                aged -> withContext(Dispatchers.Default) {
                     AgedPaper.print(
                         raw, seed = REFLOW_SEED + index, dark = darkPages, picture = imageOnly,
                         fray = fray, unit = density.density, bound = side.boundEdge,
                     )
                 }
-            } else raw
+                else -> raw
+            }
         }
-        val back = rememberBack(bitmap, aged && pageTurn == PageTurn.CURL, darkPages)
+        val back = if (cover) rememberInside(bitmap, darkPages) else rememberBack(bitmap, aged && pageTurn == PageTurn.CURL, darkPages)
         // Ganzseitige Bilder (z. B. Cover) liegen auf einem Blatt in ihrer eigenen Größe.
         val image = screenPage?.placements?.singleOrNull()?.takeIf { imageOnly }
         val count = layout.estimatedCount
@@ -198,7 +206,7 @@ internal fun ReflowPageView(
             readFraction = if (count > 1) (index / (count - 1f)).coerceAtMost(1f) else 0f,
             pageTurn = pageTurn,
             spread = spread,
-            side = side,
+            side = if (cover) PageSide.COVER else side,
             back = back,
             darkPages = darkPages,
             pageOffset = pageOffset,
@@ -234,7 +242,7 @@ private fun PageBox(
         // Im aufgeschlagenen Buch liegt jede Seite am Bundsteg: rechte Seiten links, linke rechts.
         contentAlignment = when (side) {
             PageSide.SINGLE -> Alignment.Center
-            PageSide.RIGHT -> Alignment.CenterStart
+            PageSide.RIGHT, PageSide.COVER -> Alignment.CenterStart
             PageSide.LEFT -> Alignment.CenterEnd
         },
         content = content,
@@ -297,6 +305,10 @@ private fun Sheet(
                 val visibleBottom = (top + size.height).coerceAtMost(screenHeight).coerceAtLeast(visibleTop + 1f)
                 val y = grabRootY()
                 val grabY = if (y.isNaN()) (visibleTop + visibleBottom) / 2f else y.coerceIn(visibleTop, visibleBottom)
+                if (side == PageSide.COVER) {
+                    drawHardCover(pageOffset(), bitmap, back, shadowColor, darkPages)
+                    return@Canvas
+                }
                 drawCurledPage(
                     progress = pageOffset(),
                     grab = ((grabY - visibleTop) / (visibleBottom - visibleTop)).coerceIn(0f, 1f),
@@ -342,7 +354,7 @@ private fun Sheet(
                 .padding(vertical = vPadding),
             horizontalAlignment = when (side) {
                 PageSide.SINGLE -> Alignment.CenterHorizontally
-                PageSide.RIGHT -> Alignment.Start
+                PageSide.RIGHT, PageSide.COVER -> Alignment.Start
                 PageSide.LEFT -> Alignment.End
             },
         ) { paper() }
@@ -372,10 +384,21 @@ internal fun pageSide(page: Int, spread: Boolean): PageSide = when {
 /** Kante am Bundsteg (gebunden, nicht ausgefranst): 3 = links, 1 = rechts, -1 = keine. */
 private val PageSide.boundEdge: Int
     get() = when (this) {
-        PageSide.SINGLE -> -1
+        PageSide.SINGLE, PageSide.COVER -> -1
         PageSide.RIGHT -> 3
         PageSide.LEFT -> 1
     }
+
+/** Innenseite des Buchdeckels (Leder und Vorsatzpapier) in der Größe des Deckels. */
+@Composable
+private fun rememberInside(front: ImageBitmap?, dark: Boolean): ImageBitmap? {
+    val density = LocalDensity.current.density
+    return if (front != null) {
+        rememberResult(front.width, front.height, dark) {
+            withContext(Dispatchers.Default) { HardCover.inside(front.width, front.height, dark, density) }
+        }
+    } else null
+}
 
 /** Rückseite des Blatts für das Umblättern (altes Papier, ausgefranst, Schrift scheint durch). */
 @Composable

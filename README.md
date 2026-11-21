@@ -38,7 +38,7 @@
 
 ## Features
 
-- **Looks like an old library** (Android): folders are wooden shelves and books are bound in leather with brass corners. In the view *Altes Buch* (old book, the default) an open book lies on the table: aged paper with slightly frayed edges, from a left page to the right one your eyes just move on, and only after a right page you turn the leaf. Prefer it plain? Choose the view *Slideshow*. The iPhone app keeps its plain look.
+- **Looks like an old library** (Android): folders are wooden shelves and books are bound in leather with brass corners. In the view *Altes Buch* (old book, the default) an open book lies on the table: aged paper with slightly frayed edges, from a left page to the right one your eyes just move on, and only after a right page you turn the leaf. If the first page is a picture, it becomes the hard cover, which opens with a creak and a soft thud. Prefer it plain? Choose the view *Slideshow*. The iPhone app keeps its plain look.
 - **Pages that turn like paper**, with an optional soft rustle – or a simple slideshow if you prefer.
 - **Three text sizes, nothing cut off.** *Klein* shows the whole page, *Normal* trims the white margins, and *Groß* reflows the text in large print like an e-book – even for scanned books.
 - **Your own folders.** Easy Books shows the PDFs in a folder on your device, with subfolders as shelves. Sorting a book into a folder moves the file.

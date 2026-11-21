@@ -3,6 +3,7 @@ package com.example.easybooks.ui.reader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -45,6 +46,9 @@ internal enum class PageSide {
 
     /** Rechte Seite: noch zu lesende Blätter rechts, Bundsteg links. */
     RIGHT,
+
+    /** Fester Buchdeckel des geschlossenen Buchs (erste Seite, wenn sie ein Bild ist). */
+    COVER,
 }
 
 /** Platz außen (und oben/unten) für Einband und Buchblock, wenn ein aufgeschlagenes Buch daliegt. */
@@ -84,6 +88,10 @@ internal fun Paper(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = LocalReaderColors.current
+    if (side == PageSide.COVER) {
+        CoverBoard(darkPaper, dim, modifier, content)
+        return
+    }
     val book = side != PageSide.SINGLE
     val spineAlpha = when {
         book && darkPaper -> 0.5f
@@ -126,6 +134,72 @@ internal fun Paper(
             },
         content = content,
     )
+}
+
+/** Der Buchdeckel liegt auf dem geschlossenen Buch: abgerundet, ohne Papiergrund und Bundsteg. */
+@Composable
+private fun CoverBoard(
+    dark: Boolean,
+    dim: () -> Float,
+    modifier: Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val colors = LocalReaderColors.current
+    val shape = RoundedCornerShape(topStart = 1.5.dp, bottomStart = 1.5.dp, topEnd = 5.dp, bottomEnd = 5.dp)
+    Box(
+        modifier
+            .drawBehind { drawClosedBook(colors, dark) }
+            .shadow(2.dp, shape)
+            .drawWithContent {
+                drawContent()
+                val d = dim()
+                if (d > 0f) drawRect(colors.shade, alpha = 0.22f * d)
+            },
+        content = content,
+    )
+}
+
+/**
+ * Das geschlossene Buch unter dem Deckel: rechts und unten sieht man den Buchblock und den
+ * hinteren Deckel, dazu den Schatten auf dem Tisch.
+ */
+private fun DrawScope.drawClosedBook(colors: ReaderColors, dark: Boolean) {
+    val w = size.width
+    val h = size.height
+    val depth = 7.dp.toPx()
+    val radius = CornerRadius(5.dp.toPx())
+    // Schatten auf dem Tisch.
+    val step = 1.6.dp.toPx()
+    for (i in 7 downTo 1) {
+        drawRoundRect(
+            Color.Black.copy(alpha = 0.07f),
+            topLeft = Offset(-i * step * 0.3f, -i * step * 0.5f + 2.dp.toPx()),
+            size = Size(w + depth + i * step * 1.3f, h + depth + i * step * 1.5f),
+            cornerRadius = CornerRadius(radius.x + i * step),
+        )
+    }
+    // Hinterer Deckel, um die Buchdicke nach rechts unten versetzt.
+    val leather = if (dark) listOf(Color(0xFF1C3320), Color(0xFF0E1A10)) else listOf(Color(0xFF2C4D31), Color(0xFF17301C))
+    drawRoundRect(
+        Brush.linearGradient(leather, start = Offset(0f, 0f), end = Offset(w, h)),
+        topLeft = Offset(depth * 0.55f, depth),
+        size = Size(w, h),
+        cornerRadius = radius,
+    )
+    // Buchblock dazwischen: Papierkanten mit feinen Linien.
+    val block = Rect(depth * 0.25f, depth * 0.45f, w + depth * 0.4f, h + depth * 0.8f)
+    drawRect(colors.paperEdge, topLeft = block.topLeft, size = block.size)
+    val line = lerp(colors.paperEdge, Color.Black, 0.3f).copy(alpha = 0.55f)
+    var y = h
+    while (y < block.bottom) {
+        drawLine(line, Offset(block.left, y), Offset(block.right, y), strokeWidth = 0.5.dp.toPx())
+        y += 1.3.dp.toPx()
+    }
+    var x = w
+    while (x < block.right) {
+        drawLine(line, Offset(x, block.top), Offset(x, block.bottom), strokeWidth = 0.5.dp.toPx())
+        x += 1.3.dp.toPx()
+    }
 }
 
 private fun DrawScope.drawSheetEdges(colors: ReaderColors, left: Int, right: Int, vInset: Float) {
