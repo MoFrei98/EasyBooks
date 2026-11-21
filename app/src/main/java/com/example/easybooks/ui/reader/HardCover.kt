@@ -38,15 +38,53 @@ import kotlin.math.sin
  */
 internal object HardCover {
 
-    /** Vorderseite des Deckels: das Cover auf einem festen, eingebundenen Deckel. */
-    fun front(page: ImageBitmap, dark: Boolean, unit: Float): ImageBitmap {
+    /**
+     * Vorderseite des Deckels in der Größe [boardWidth] × [boardHeight] (so groß wie die Seiten
+     * plus Überstand): Leder mit Goldlinie, das Cover als eingelassenes Titelbild mit Goldrahmen.
+     */
+    fun front(page: ImageBitmap, boardWidth: Int, boardHeight: Int, dark: Boolean, unit: Float): ImageBitmap {
         val src = page.asAndroidBitmap()
-        val w = src.width.toFloat()
-        val h = src.height.toFloat()
-        val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+        val w = boardWidth.toFloat()
+        val h = boardHeight.toFloat()
+        val out = Bitmap.createBitmap(boardWidth, boardHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
-        canvas.drawBitmap(src, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG).apply {
+        // Leder des Deckels.
+        canvas.drawRect(0f, 0f, w, h, Paint().apply {
+            shader = LinearGradient(
+                0f, 0f, w, h,
+                if (dark) 0xFF1C3320.toInt() else 0xFF34593A.toInt(),
+                if (dark) 0xFF0E1A10.toInt() else 0xFF1E3823.toInt(),
+                Shader.TileMode.CLAMP,
+            )
+        })
+        // Goldlinie entlang der Kante.
+        val gold = if (dark) 0xFF8C7445.toInt() else 0xFFC9A55A.toInt()
+        val line = w * 0.035f
+        canvas.drawRect(line, line, w - line, h - line, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1.2f * unit
+            color = gold
+        })
+        // Titelbild: so groß wie möglich, eingepasst, mittig.
+        val margin = w * 0.07f
+        val boxW = w - 2 * margin
+        val boxH = h - 2 * margin
+        val scale = minOf(boxW / src.width, boxH / src.height)
+        val iw = src.width * scale
+        val ih = src.height * scale
+        val left = (w - iw) / 2f + w * 0.015f
+        val top = (h - ih) / 2f
+        val dst = android.graphics.RectF(left, top, left + iw, top + ih)
+        canvas.drawRect(dst.left - 1.5f * unit, dst.top - 1.5f * unit, dst.right + 1.5f * unit, dst.bottom + 1.5f * unit, Paint().apply {
+            color = 0x66000000
+        })
+        canvas.drawBitmap(src, null, dst, Paint(Paint.FILTER_BITMAP_FLAG).apply {
             if (dark) colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setScale(0.8f, 0.8f, 0.8f, 1f) })
+        })
+        canvas.drawRect(dst, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1.6f * unit
+            color = gold
         })
         // Lederstruktur: feine Poren und ein paar abgegriffene Stellen.
         canvas.drawRect(0f, 0f, w, h, Paint().apply {

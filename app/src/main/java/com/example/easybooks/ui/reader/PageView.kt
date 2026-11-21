@@ -49,6 +49,9 @@ internal val PageHPaddingClose = 2.dp
 private val PageVPadding = 16.dp
 internal val ReflowVPadding = 10.dp
 
+/** So weit steht der feste Buchdeckel außen, oben und unten über die Seiten über. */
+internal val CoverOverhang = 4.dp
+
 /** Andere Papierflecken für neu umbrochene Seiten als für PDF-Seiten mit gleicher Nummer. */
 private const val REFLOW_SEED = 50021
 
@@ -97,31 +100,45 @@ internal fun PageView(
 
         // Seitenverhältnis des sichtbaren Ausschnitts.
         val aspect = (pdfSize.height * crop.height) / (pdfSize.width * crop.width)
+        val aged = LocalReaderColors.current.aged
+        // Im Dark Mode und auf altem Papier erst wissen, ob es eine Bildseite ist, damit nichts aufblitzt.
+        val imagePage = if (darkPages || aged) rememberResult(page, "image") { vm.isImagePage(page) } else false
+        // Ansicht "Altes Buch": Ist die erste Seite ein Bild, ist sie der feste Buchdeckel. Er ist
+        // mindestens so groß wie die Seiten des Buchs (gemessen an der nächsten Seite) und steht über.
+        val cover = side == PageSide.RIGHT && page == 0 && imagePage == true
+        val pagesAspect = if (cover && pageCount > 1) {
+            rememberResult(zoom, "pages") {
+                val next = vm.pageSize(1)
+                val nextCrop = if (zoom == ZoomMode.WIDE) Crop.FULL else vm.pageCrop(1, tight = true)
+                (next.height * nextCrop.height) / (next.width * nextCrop.width)
+            } ?: return@PageBox
+        } else aspect
+        val sheetAspect = if (cover) maxOf(aspect, pagesAspect) else aspect
         // Ohne Ränder zählt jeder Millimeter, dort ist der Abstand zum Bildschirmrand schmaler.
         // Im aufgeschlagenen Buch liegt die Seite am Bundsteg bündig, außen sind Einband und Buchblock.
         val hPadding = if (zoom == ZoomMode.WIDE) PageHPadding else PageHPaddingClose
         val vPadding = if (side == PageSide.SINGLE) PageVPadding else BookVerticalMargin
         val availableWidth = if (side == PageSide.SINGLE) maxWidth - hPadding * 2 else maxWidth - BookOuterMargin
         val availableHeight = maxHeight - vPadding * 2
-        val width = when (zoom) {
-            ZoomMode.WIDE -> minOf(availableWidth, availableHeight / aspect)
-            ZoomMode.NORMAL, ZoomMode.CLOSE -> availableWidth
+        val overhang = if (cover) CoverOverhang else 0.dp
+        val pageWidth = when (zoom) {
+            ZoomMode.WIDE -> minOf(availableWidth - overhang, (availableHeight - overhang * 2) / sheetAspect)
+            ZoomMode.NORMAL, ZoomMode.CLOSE -> availableWidth - overhang
         }
-        val height = width * aspect
+        val width = pageWidth + overhang
+        val height = pageWidth * sheetAspect + overhang * 2
         val scrollable = height > availableHeight + 1.dp
 
         val density = LocalDensity.current
         val widthPx = with(density) { width.roundToPx() }
+        val heightPx = with(density) { height.roundToPx() }
         val fray = with(density) { FrayDepth.toPx() }
-        val aged = LocalReaderColors.current.aged
-        // Im Dark Mode und auf altem Papier erst wissen, ob es eine Bildseite ist, damit nichts aufblitzt.
-        val imagePage = if (darkPages || aged) rememberResult(page, "image") { vm.isImagePage(page) } else false
-        // Ansicht "Altes Buch": Ist die erste Seite ein Bild, ist sie der feste Buchdeckel.
-        val cover = side == PageSide.RIGHT && page == 0 && imagePage == true
-        val bitmap = rememberResult(page, widthPx, crop, aged, darkPages, imagePage, cover) {
+        val bitmap = rememberResult(page, widthPx, heightPx, crop, aged, darkPages, imagePage, cover) {
             val raw = vm.renderPage(page, widthPx, crop)
             when {
-                cover -> withContext(Dispatchers.Default) { HardCover.front(raw, darkPages, density.density) }
+                cover -> withContext(Dispatchers.Default) {
+                    HardCover.front(raw, widthPx, heightPx, darkPages, density.density)
+                }
                 aged && imagePage != null -> withContext(Dispatchers.Default) {
                     AgedPaper.print(
                         raw, seed = page, dark = darkPages, picture = imagePage, fray = fray,
@@ -183,7 +200,10 @@ internal fun ReflowPageView(
             val raw = vm.renderReflowPage(layout, index)
             when {
                 raw == null -> null
-                cover -> withContext(Dispatchers.Default) { HardCover.front(raw, darkPages, density.density) }
+                cover -> withContext(Dispatchers.Default) {
+                    val o = with(density) { CoverOverhang.roundToPx() }
+                    HardCover.front(raw, frame.width + o, frame.height + 2 * o, darkPages, density.density)
+                }
                 aged -> withContext(Dispatchers.Default) {
                     AgedPaper.print(
                         raw, seed = REFLOW_SEED + index, dark = darkPages, picture = imageOnly,
@@ -199,8 +219,15 @@ internal fun ReflowPageView(
         val count = layout.estimatedCount
         Sheet(
             page = index,
-            width = with(density) { (image?.dstWidth ?: frame.width.toFloat()).toDp() },
-            height = with(density) { (image?.dstHeight ?: frame.height.toFloat()).toDp() },
+            // Der Buchdeckel ist so groß wie die Seiten und steht über; andere Bilder liegen in ihrer Größe.
+            width = when {
+                cover -> with(density) { frame.width.toDp() } + CoverOverhang
+                else -> with(density) { (image?.dstWidth ?: frame.width.toFloat()).toDp() }
+            },
+            height = when {
+                cover -> with(density) { frame.height.toDp() } + CoverOverhang * 2
+                else -> with(density) { (image?.dstHeight ?: frame.height.toFloat()).toDp() }
+            },
             bitmap = bitmap,
             imagePage = if (darkPages || aged) imageOnly else false,
             readFraction = if (count > 1) (index / (count - 1f)).coerceAtMost(1f) else 0f,
