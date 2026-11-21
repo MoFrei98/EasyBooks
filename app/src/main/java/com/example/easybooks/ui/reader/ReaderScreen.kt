@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,18 +31,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -61,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
@@ -79,15 +74,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.easybooks.R
 import com.example.easybooks.data.AppSettings
+import com.example.easybooks.data.ReadingView
 import com.example.easybooks.data.PageTurn
 import com.example.easybooks.data.ZoomMode
 import com.example.easybooks.reflow.ReflowFrame
 import com.example.easybooks.ui.settings.ThemeToggleButton
+import com.example.easybooks.ui.theme.BrassRule
+import com.example.easybooks.ui.theme.LeatherTopBar
 import com.example.easybooks.ui.theme.LocalDarkTheme
-import com.example.easybooks.ui.theme.LocalReaderColors
+import com.example.easybooks.ui.theme.Palette
+import com.example.easybooks.ui.theme.Plaque
+import com.example.easybooks.ui.theme.PlaqueStyle
+import com.example.easybooks.ui.theme.brassSliderColors
+import com.example.easybooks.ui.theme.leatherBackground
+import com.example.easybooks.ui.theme.woodBackground
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 @Composable
@@ -100,14 +104,16 @@ fun ReaderScreen(
 ) {
     val vm: ReaderViewModel = viewModel(factory = ReaderViewModel.factory(bookId))
     val state by vm.state.collectAsStateWithLifecycle()
+    LightNavigationIcons()
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(LocalReaderColors.current.backdrop)
+            // Die Seiten liegen auf einem Lesetisch aus Holz.
+            .woodBackground(LocalDarkTheme.current)
     ) {
         when (val s = state) {
-            ReaderState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+            ReaderState.Loading -> CircularProgressIndicator(color = Palette.BrassLight, modifier = Modifier.align(Alignment.Center))
             is ReaderState.Failed -> ReaderError(
                 state = s,
                 onBack = onBack,
@@ -142,9 +148,12 @@ private fun Reader(
     } else {
         // Startseite nur beim Betreten festlegen, nicht bei jedem Umblättern neu.
         val initialPage = remember { vm.position.page }
+        // Ist die erste Seite ein Bild, ist sie im alten Buch der feste Deckel (eigenes Geräusch).
+        val coverFirst by produceState(false, vm) { value = vm.isImagePage(0) }
         PagedReader(
             title = ready.title,
             settings = settings,
+            coverFirst = coverFirst,
             initialPage = initialPage,
             pageCount = ready.pageCount,
             shownCount = ready.pageCount,
@@ -159,6 +168,7 @@ private fun Reader(
                 pageCount = ready.pageCount,
                 zoom = settings.pageSize,
                 pageTurn = settings.pageTurn,
+                spread = settings.spread,
                 // Im Dark Mode werden die Seiten immer abgedunkelt.
                 darkPages = LocalDarkTheme.current,
                 pageOffset = pageOffset,
@@ -185,11 +195,13 @@ private fun ReflowReader(
         val density = LocalDensity.current
         val direction = LocalLayoutDirection.current
         val cutout = WindowInsets.displayCutout.asPaddingValues()
+        // Im aufgeschlagenen Buch braucht es außen, oben und unten Platz für Einband und Buchblock.
+        val book = settings.spread
         val params = with(density) {
             val width = maxWidth - cutout.calculateLeftPadding(direction) -
-                cutout.calculateRightPadding(direction) - PageHPaddingClose * 2
+                cutout.calculateRightPadding(direction) - (if (book) BookOuterMargin else PageHPaddingClose * 2)
             val height = maxHeight - cutout.calculateTopPadding() - cutout.calculateBottomPadding() -
-                ReflowVPadding * 2
+                (if (book) BookVerticalMargin else ReflowVPadding) * 2
             ReflowParams(
                 frame = ReflowFrame(
                     width = width.roundToPx(),
@@ -217,6 +229,7 @@ private fun ReflowReader(
             PagedReader(
                 title = ready.title,
                 settings = settings,
+                coverFirst = current.pages.firstOrNull()?.imageOnly == true,
                 initialPage = start,
                 pageCount = current.pages.size,
                 shownCount = current.estimatedCount,
@@ -230,6 +243,7 @@ private fun ReflowReader(
                     layout = current,
                     index = index,
                     pageTurn = settings.pageTurn,
+                    spread = settings.spread,
                     darkPages = LocalDarkTheme.current,
                     pageOffset = pageOffset,
                     grabRootY = grabRootY,
@@ -254,20 +268,24 @@ private fun ReflowPreparing(
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            CircularProgressIndicator(progress = { progress.coerceIn(0.02f, 1f) })
+            CircularProgressIndicator(
+                progress = { progress.coerceIn(0.02f, 1f) },
+                color = Palette.BrassLight,
+                trackColor = Palette.BrassLight.copy(alpha = 0.2f),
+            )
             Spacer(Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.reflow_preparing, (progress * 100).roundToInt()),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = Palette.OnWood,
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.reflow_preparing_hint),
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Palette.BrassLight.copy(alpha = 0.8f),
             )
         }
         ReaderTopBar(title = title, onBack = onBack, actions = actions)
@@ -284,6 +302,7 @@ private fun ReflowPreparing(
 private fun PagedReader(
     title: String,
     settings: AppSettings,
+    coverFirst: Boolean,
     initialPage: Int,
     pageCount: Int,
     shownCount: Int,
@@ -316,6 +335,7 @@ private fun PagedReader(
     ImmersiveMode(enabled = !barsVisible)
 
     val bookPages = settings.pageTurn == PageTurn.CURL
+    val spread = settings.spread
     val context = LocalContext.current
     val sound = remember(settings.pageTurnSound) {
         if (settings.pageTurnSound) PageTurnSound(context.applicationContext) else null
@@ -324,7 +344,7 @@ private fun PagedReader(
 
     // Seite, für die das Geräusch zuletzt gespielt wurde (verhindert doppeltes Rascheln).
     val soundedPage = remember { IntArray(1) { -1 } }
-    LaunchedEffect(pagerState, sound, bookPages) {
+    LaunchedEffect(pagerState, sound, bookPages, spread) {
         if (sound == null) return@LaunchedEffect
         snapshotFlow { pagerState.currentPage to pagerState.settledPage }.collect { (current, settled) ->
             when {
@@ -332,7 +352,12 @@ private fun PagedReader(
                 // Beim Wischen kippt die Seite über die Mitte: jetzt raschelt es.
                 abs(current - settled) == 1 && current != soundedPage[0] -> {
                     soundedPage[0] = current
-                    sound.play(bookPages)
+                    // Von der linken zur rechten Seite gehen nur die Augen weiter: kein Rascheln.
+                    val transition = min(current, settled)
+                    when {
+                        spread && coverFirst && transition == 0 -> sound.playCover()
+                        curlsAfter(transition, spread) -> sound.play(bookPages)
+                    }
                 }
             }
         }
@@ -347,12 +372,23 @@ private fun PagedReader(
         val target = (base + delta).coerceIn(0, pagerState.pageCount - 1)
         if (target == base) return
         soundedPage[0] = target
-        sound?.play(bookPages)
+        // Bei Doppelseiten wird nur nach einer rechten Seite umgeblättert, sonst gleiten die Seiten.
+        val turnsLeaf = bookPages && curlsAfter(min(base, target), spread)
+        // Der feste Buchdeckel klappt langsamer auf und klingt anders.
+        val opensCover = spread && coverFirst && min(base, target) == 0
+        when {
+            opensCover -> sound?.playCover()
+            !spread || turnsLeaf -> sound?.play(bookPages)
+        }
         scope.launch {
             pagerState.animateScrollToPage(
                 page = target,
                 animationSpec = tween(
-                    durationMillis = if (bookPages) TAP_TURN_BOOK_MS else TAP_TURN_SLIDE_MS,
+                    durationMillis = when {
+                        opensCover -> TAP_TURN_COVER_MS
+                        turnsLeaf -> TAP_TURN_BOOK_MS
+                        else -> TAP_TURN_SLIDE_MS
+                    },
                     easing = FastOutSlowInEasing,
                 ),
             )
@@ -430,14 +466,14 @@ private fun PagedReader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderTopBar(
     title: String,
     onBack: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    TopAppBar(
+    LeatherTopBar(
+        medallion = false,
         title = {
             Text(
                 text = title,
@@ -452,9 +488,6 @@ private fun ReaderTopBar(
             }
         },
         actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
     )
 }
 
@@ -468,12 +501,13 @@ private fun ReaderBottomBar(
 ) {
     var dragValue by remember { mutableStateOf<Float?>(null) }
     val shownPage = dragValue?.roundToInt() ?: currentPage
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        // Textfarbe ausdrücklich setzen, sonst erbt sie eine dunkle Farbe von außen.
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.fillMaxWidth(),
+    val night = LocalDarkTheme.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .leatherBackground(night, flip = true)
     ) {
+        BrassRule(medallion = false, modifier = Modifier.graphicsLayer { rotationZ = 180f })
         Column(
             Modifier
                 .navigationBarsPadding()
@@ -486,12 +520,14 @@ private fun ReaderBottomBar(
                     shownPage + 1,
                     max(shownCount, pageCount),
                 ),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Palette.BrassLight,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
             if (pageCount > 1) {
                 Slider(
+                    colors = brassSliderColors(),
                     value = dragValue ?: currentPage.toFloat(),
                     onValueChange = { dragValue = it },
                     onValueChangeFinished = {
@@ -520,15 +556,28 @@ private fun ReaderError(
             text = state.message,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = Palette.OnWood,
         )
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            Plaque(text = stringResource(R.string.back), onClick = onBack, style = PlaqueStyle.LEATHER, small = true)
             if (state.canRemove) {
-                Button(onClick = onRemove) { Text(stringResource(R.string.remove_from_library)) }
+                Plaque(text = stringResource(R.string.remove_from_library), onClick = onRemove, small = true)
             }
         }
+    }
+}
+
+/** Unten liegt im Reader eine Lederleiste oder Holz: helle Symbole in der Navigationsleiste. */
+@Composable
+private fun LightNavigationIcons() {
+    val activity = LocalActivity.current ?: return
+    val view = LocalView.current
+    val dark = LocalDarkTheme.current
+    DisposableEffect(dark) {
+        val controller = WindowCompat.getInsetsController(activity.window, view)
+        controller.isAppearanceLightNavigationBars = false
+        onDispose { controller.isAppearanceLightNavigationBars = !dark }
     }
 }
 
@@ -560,3 +609,11 @@ private val ReflowMarginBottom = 22.dp
 /** Dauer des Umblätterns beim Tippen auf den Rand. */
 private const val TAP_TURN_BOOK_MS = 1000
 private const val TAP_TURN_SLIDE_MS = 450
+private const val TAP_TURN_COVER_MS = 1000
+
+/**
+ * Lesen wie in einem aufgeschlagenen Buch (Ansicht "Altes Buch"): Dann liegen immer eine
+ * linke und eine rechte Seite nebeneinander (siehe [curlsAfter]).
+ */
+private val AppSettings.spread: Boolean
+    get() = view == ReadingView.OLD_BOOK

@@ -59,7 +59,10 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
-            EasyBooksTheme(darkTheme = darkTheme) {
+            EasyBooksTheme(
+                darkTheme = darkTheme,
+                agedPaper = current.agedPaper,
+            ) {
                 EasyBooksNavigation(libraryViewModel, current, settingsRepository)
             }
         }
@@ -147,7 +150,7 @@ private fun EasyBooksNavigation(
             settings = settings,
             onThemeChange = { scope.launch { settingsRepository.setTheme(it) } },
             onPageSizeChange = { scope.launch { settingsRepository.setPageSize(it) } },
-            onPageTurnChange = { scope.launch { settingsRepository.setPageTurn(it) } },
+            onViewChange = { scope.launch { settingsRepository.setView(it) } },
             onPageTurnSoundChange = { scope.launch { settingsRepository.setPageTurnSound(it) } },
             onChooseLibraryFolder = {
                 showSettings = false

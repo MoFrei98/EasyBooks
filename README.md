@@ -25,25 +25,26 @@
 <br>
 
 <p align="center">
-  <img src="docs/screenshots/library.png" height="400" alt="Library with folders on Android">
+  <img src="docs/screenshots/library.png" height="400" alt="Library with wooden shelves and leather-bound books">
   &nbsp;
-  <img src="docs/screenshots/page-turn.png" height="400" alt="Turning a page on Android">
+  <img src="docs/screenshots/page-turn.png" height="400" alt="Turning an aged page">
   &nbsp;
-  <img src="docs/screenshots/ios-large-text.png" height="400" alt="Large print on iPhone">
+  <img src="docs/screenshots/large-text.png" height="400" alt="Large print on aged paper">
   &nbsp;
-  <img src="docs/screenshots/ios-dark-mode.png" height="400" alt="Dark mode on iPhone">
+  <img src="docs/screenshots/dark-mode.png" height="400" alt="Dark mode: the library by night">
 </p>
 
-<p align="center"><sub>Library and page turn on Android · Large print and dark mode on iPhone · The app is in German</sub></p>
+<p align="center"><sub>Android: library, page turn, large print and dark mode · The app is in German</sub></p>
 
 ## Features
 
+- **Looks like an old library** (Android): folders are wooden shelves and books are bound in leather with brass corners. In the view *Altes Buch* (old book, the default) an open book lies on the table: aged paper with slightly frayed edges, from a left page to the right one your eyes just move on, and only after a right page you turn the leaf. If the first page is a picture, it becomes the hard cover, which swings open and lands with a soft thud. Prefer it plain? Choose the view *Slideshow*. The iPhone app keeps its plain look.
 - **Pages that turn like paper**, with an optional soft rustle – or a simple slideshow if you prefer.
 - **Three text sizes, nothing cut off.** *Klein* shows the whole page, *Normal* trims the white margins, and *Groß* reflows the text in large print like an e-book – even for scanned books.
 - **Your own folders.** Easy Books shows the PDFs in a folder on your device, with subfolders as shelves. Sorting a book into a folder moves the file.
 - **Title, author and year** are filled in automatically and can be edited.
 - **Search and filters** across all folders: unread, started, finished.
-- **Dark mode** for the app and the pages.
+- **Dark mode** for the app and the pages – on Android a library by night, with dark wood and warm brass.
 - **Picks up where you left off** in every book.
 - **Open PDFs from other apps** with *Open with* (Android) or *Share* (iPhone).
 - **Private.** No account, no ads, no tracking, and no internet connection at all.
@@ -84,7 +85,7 @@ Easy Books is not in the App Store. Apple only lets an iPhone run apps that are 
 
 **iPhone:** nothing to set up. Your library is the folder **On My iPhone › Easy Books** in the Files app. Put PDFs there, or open a PDF in another app and choose **Share → Easy Books**.
 
-**Reading:** swipe or tap the right or left edge to turn the page. Tap the middle to show the toolbars, use the slider to jump to any page. Text size, design (light/dark) and page-turn style are in the settings (gear icon).
+**Reading:** swipe or tap the right or left edge to turn the page. Tap the middle to show the toolbars, use the slider to jump to any page. Text size, design (light/dark) and the view (on Android *Slideshow* or *Altes Buch*) are in the settings (gear icon).
 
 ## Privacy
 

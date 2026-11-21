@@ -3,13 +3,17 @@ Erzeugt die Umblätter-Geräusche für Easy Books synthetisch (keine fremden Auf
 daher keine Lizenzfragen).
 
 Aufruf:  python tools/make_page_sounds.py
-Ausgabe: app/src/main/res/raw/page_turn_1.wav … page_turn_3.wav, page_slide.wav
+Ausgabe: app/src/main/res/raw/page_turn_1.wav … page_turn_3.wav, page_slide.wav, cover_open.wav
 
 Ein Papier-Rascheln besteht hier aus zwei Teilen:
 - "Swish": gefiltertes Rauschen, das an- und abschwillt (die Seite streicht durch die Luft)
 - "Knistern": viele kurze, helle Klicks (das Papier biegt sich)
 
 Bewusst ohne dumpfen Ton am Ende: Der klang wie ein zugeschlagenes Hardcover-Buch.
+
+Genau den gibt es dafür beim Buchdeckel (cover_open.wav, Ansicht "Altes Buch"):
+Der Deckel streicht leise durch die Luft und liegt dumpf auf. (Ein Knarzen im
+Falz vorweg klang eher nach etwas anderem und ist wieder raus.)
 """
 import os
 import wave
@@ -63,6 +67,32 @@ def page_turn(seed, length=0.32, brightness=1.0, crackle=1.0):
     return mix
 
 
+def hardcover(seed, length=1.05):
+    """Ein fester Buchdeckel wird aufgeklappt und legt sich ab."""
+    rng = np.random.default_rng(seed)
+    n = int(RATE * length)
+    t = np.arange(n) / RATE
+
+    # Luftzug: tiefes, weiches Rauschen, das anschwillt, solange der Deckel schwingt.
+    whoosh = bandpass(rng.standard_normal(n), 180, 1600)
+    whoosh *= envelope(n, 1.6, 0.55, 3.0)
+
+    # Aufliegen: tiefer, kurzer Ton mit fallender Tonhöhe und etwas Klopfen.
+    land = int(RATE * 0.74)
+    k = np.arange(n - land) / RATE
+    freq = 95 * np.exp(-k * 3.0) + 55
+    phase = 2 * np.pi * np.cumsum(freq) / RATE
+    thud = np.zeros(n)
+    thud[land:] = np.sin(phase) * np.exp(-k / 0.075)
+    knock = np.zeros(n)
+    knock[land:] = bandpass(rng.standard_normal(n - land), 120, 900) * np.exp(-k / 0.03)
+
+    mix = 0.3 * whoosh / (np.abs(whoosh).max() + 1e-9) \
+        + 1.0 * thud \
+        + 0.45 * knock / (np.abs(knock).max() + 1e-9)
+    return mix
+
+
 def finish(signal, peak_db):
     fade_in = int(RATE * 0.006)
     fade_out = int(RATE * 0.06)
@@ -88,3 +118,5 @@ save("page_turn_2.wav", finish(page_turn(seed=23, length=0.35, brightness=0.9), 
 save("page_turn_3.wav", finish(page_turn(seed=37, length=0.3, brightness=1.1, crackle=1.2), -4))
 # Slideshow: kürzer, weicher, leiser, ohne Knistern
 save("page_slide.wav", finish(page_turn(seed=5, length=0.24, brightness=0.7, crackle=0.0), -12))
+# Buchdeckel (Ansicht "Altes Buch", erste Seite)
+save("cover_open.wav", finish(hardcover(seed=41), -3))

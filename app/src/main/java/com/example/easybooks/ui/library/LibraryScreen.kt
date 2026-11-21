@@ -41,26 +41,20 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -96,6 +90,26 @@ import com.example.easybooks.data.Book
 import com.example.easybooks.data.BookFilter
 import com.example.easybooks.data.FolderPaths
 import com.example.easybooks.data.LibrarySort
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.example.easybooks.ui.theme.BrassBrush
+import com.example.easybooks.ui.theme.EasyBooksType
+import com.example.easybooks.ui.theme.Fleur
+import com.example.easybooks.ui.theme.FlourishDivider
+import com.example.easybooks.ui.theme.LeatherFrame
+import com.example.easybooks.ui.theme.LeatherTopBar
+import com.example.easybooks.ui.theme.LocalDarkTheme
+import com.example.easybooks.ui.theme.Palette
+import com.example.easybooks.ui.theme.Plaque
+import com.example.easybooks.ui.theme.PlaqueStyle
+import com.example.easybooks.ui.theme.RibbonProgress
+import com.example.easybooks.ui.theme.Textures
+import com.example.easybooks.ui.theme.parchmentBackground
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -139,7 +153,11 @@ fun LibraryScreen(
     // Später deklariert = hat Vorrang: zuerst die Suche schließen, dann eine Ebene hoch.
     BackHandler(enabled = searchOpen) { vm.closeSearch() }
 
+    val dark = LocalDarkTheme.current
     Scaffold(
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.parchmentBackground(dark),
         topBar = {
             if (searchOpen) {
                 SearchTopBar(
@@ -147,11 +165,12 @@ fun LibraryScreen(
                     onQueryChange = vm::setQuery,
                     onClose = vm::closeSearch,
                 )
-            } else TopAppBar(
+            } else LeatherTopBar(
                 title = {
                     Column {
                         Text(
                             if (inFolder) FolderPaths.name(ui!!.path) else stringResource(R.string.library_title),
+                            style = EasyBooksType.screenTitle,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -159,7 +178,7 @@ fun LibraryScreen(
                             Text(
                                 FolderPaths.parent(ui.path).replace("/", " › "),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = Palette.BrassLight.copy(alpha = 0.75f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -193,10 +212,10 @@ fun LibraryScreen(
         },
         floatingActionButton = {
             if (ui != null && !searchOpen && (ui.totalBooks > 0 || ui.folders.isNotEmpty() || inFolder)) {
-                ExtendedFloatingActionButton(
+                Plaque(
+                    text = stringResource(R.string.add_pdf),
                     onClick = pickPdf,
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text(stringResource(R.string.add_pdf)) },
+                    icon = Icons.Filled.Add,
                 )
             }
         },
@@ -247,9 +266,11 @@ fun LibraryScreen(
             }
             if (busy) {
                 LinearProgressIndicator(
-                    Modifier
+                    color = Palette.Brass,
+                    trackColor = Palette.Brass.copy(alpha = 0.2f),
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
+                        .align(Alignment.TopCenter),
                 )
             }
         }
@@ -392,20 +413,27 @@ private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    TopAppBar(
+    LeatherTopBar(
+        medallion = false,
         title = {
             TextField(
                 value = text,
                 onValueChange = update,
                 placeholder = { Text(stringResource(R.string.search_hint)) },
                 singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Palette.Brass,
+                    unfocusedIndicatorColor = Palette.Brass.copy(alpha = 0.5f),
+                    focusedTextColor = Palette.OnWood,
+                    unfocusedTextColor = Palette.OnWood,
+                    cursorColor = Palette.BrassLight,
+                    focusedPlaceholderColor = Palette.BrassLight.copy(alpha = 0.6f),
+                    unfocusedPlaceholderColor = Palette.BrassLight.copy(alpha = 0.6f),
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -433,8 +461,9 @@ private fun FilterChips(filter: BookFilter, onFilter: (BookFilter) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .selectableGroup()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
     ) {
         listOf(
             BookFilter.ALL to R.string.filter_all,
@@ -443,13 +472,12 @@ private fun FilterChips(filter: BookFilter, onFilter: (BookFilter) -> Unit) {
             BookFilter.FINISHED to R.string.filter_finished,
         ).forEach { (option, label) ->
             val selected = filter == option
-            FilterChip(
-                selected = selected,
+            Plaque(
+                text = stringResource(label),
                 onClick = { onFilter(option) },
-                label = { Text(stringResource(label)) },
-                leadingIcon = if (selected) {
-                    { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                } else null,
+                style = if (selected) PlaqueStyle.BRASS else PlaqueStyle.OUTLINE,
+                small = true,
+                selected = selected,
             )
         }
     }
@@ -469,13 +497,13 @@ private fun NoResults(text: String, action: String? = null, onAction: () -> Unit
             Icons.Filled.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(56.dp),
         )
-        Spacer(Modifier.height(16.dp))
+        FlourishDivider(MaterialTheme.colorScheme.primary, Modifier.padding(vertical = 12.dp), width = 160.dp, height = 16.dp)
         Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         if (action != null) {
-            Spacer(Modifier.height(16.dp))
-            OutlinedButton(onClick = onAction) { Text(action) }
+            Spacer(Modifier.height(20.dp))
+            Plaque(text = action, onClick = onAction, style = PlaqueStyle.OUTLINE, small = true)
         }
     }
 }
@@ -573,48 +601,7 @@ private fun FolderCard(
             .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
             .padding(8.dp)
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(0.707f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (tile.covers.isEmpty()) {
-                Icon(
-                    painterResource(R.drawable.ic_folder),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.55f),
-                    modifier = Modifier.size(72.dp),
-                )
-            } else {
-                FannedCovers(tile.covers, coverFile)
-            }
-            // Ordner-Abzeichen unten links
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_folder),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    tile.bookCount.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
+        ShelfCompartment(tile, coverFile)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Top) {
             Text(
@@ -659,33 +646,116 @@ private fun FolderCard(
     }
 }
 
-/** Bis zu drei Cover, leicht aufgefächert wie Bücher auf einem Stapel. */
+/**
+ * Ein Ordner als Regalfach aus Holz: Bis zu drei Bücher stehen auf dem Regalboden,
+ * oben rechts zeigt ein Messingschild die Anzahl.
+ */
 @Composable
-private fun FannedCovers(covers: List<Book>, coverFile: (Book) -> File) {
-    val angles = when (covers.size) {
-        1 -> listOf(0f)
-        2 -> listOf(-8f, 8f)
-        else -> listOf(-11f, 0f, 11f)
-    }
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val shift = with(LocalDensity.current) { (maxWidth * 0.16f).toPx() }
-        covers.forEachIndexed { index, book ->
-            val angle = angles[index]
-            CoverImage(
-                book = book,
-                file = coverFile(book),
-                modifier = Modifier
-                    .fillMaxWidth(0.56f)
-                    .aspectRatio(0.707f)
-                    .graphicsLayer {
-                        rotationZ = angle
-                        translationX = shift * (angle / 11f)
-                        translationY = -shift * 0.15f
-                    }
-                    .shadow(4.dp, RoundedCornerShape(3.dp)),
+private fun ShelfCompartment(tile: FolderTile, coverFile: (Book) -> File) {
+    val dark = LocalDarkTheme.current
+    val shape = RoundedCornerShape(4.dp)
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.707f)
+            .shadow(4.dp, shape, clip = false)
+            .clip(shape)
+            .drawBehind { drawShelf(dark, board = BoardHeight.toPx()) },
+    ) {
+        if (tile.covers.isEmpty()) {
+            Fleur(
+                Palette.BrassLight.copy(alpha = 0.3f),
+                Modifier.align(Alignment.Center),
+                width = 34.dp,
+            )
+        } else {
+            // Mittleres Buch vorn, die äußeren lehnen sich leicht an.
+            val placements = when (tile.covers.size) {
+                1 -> listOf(0f to 0f)
+                2 -> listOf(-0.17f to -3f, 0.17f to 3f)
+                else -> listOf(-0.27f to -4f, 0.27f to 4f, 0f to 0f)
+            }
+            val order = if (tile.covers.size >= 3) listOf(0, 2, 1) else tile.covers.indices.toList()
+            val shift = with(LocalDensity.current) { maxWidth.toPx() }
+            order.forEachIndexed { slot, coverIndex ->
+                val book = tile.covers[coverIndex]
+                val (dx, angle) = placements[slot]
+                CoverImage(
+                    book = book,
+                    file = coverFile(book),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = BoardHeight + 1.dp)
+                        .fillMaxWidth(0.5f)
+                        .aspectRatio(0.707f)
+                        .graphicsLayer {
+                            translationX = shift * dx
+                            rotationZ = angle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                        }
+                        .shadow(3.dp, RoundedCornerShape(2.dp)),
+                )
+            }
+        }
+        // Messingschild mit der Anzahl der Bücher
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 9.dp, end = 9.dp)
+                .shadow(2.dp, RoundedCornerShape(5.dp), clip = false)
+                .clip(RoundedCornerShape(5.dp))
+                .background(BrassBrush)
+                .border(1.dp, Palette.BrassDark, RoundedCornerShape(5.dp))
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_folder),
+                contentDescription = null,
+                tint = Palette.OnBrass,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            // Zahlen in Alegreya: In den alten Fell-Typen sieht die 1 wie ein I aus.
+            Text(
+                tile.bookCount.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = Palette.OnBrass,
             )
         }
     }
+}
+
+/** Höhe des Regalbodens im Regalfach. */
+private val BoardHeight = 13.dp
+
+/** Holzfach: Rückwand, Seitenwände mit Schatten und ein Regalboden. */
+private fun DrawScope.drawShelf(dark: Boolean, board: Float) {
+    drawRect(Textures.woodBrush)
+    // Rückwand liegt tiefer: oben und an den Seiten im Schatten.
+    drawRect(
+        Brush.verticalGradient(
+            0f to Color.Black.copy(alpha = 0.5f),
+            0.45f to Color.Black.copy(alpha = 0.15f),
+            1f to Color.Black.copy(alpha = 0.32f),
+        )
+    )
+    val wall = 5.dp.toPx()
+    drawRect(Palette.WoodLight, size = Size(wall, size.height))
+    drawRect(Palette.WoodLight, topLeft = Offset(size.width - wall, 0f), size = Size(wall, size.height))
+    drawRect(Palette.WoodLight, size = Size(size.width, wall))
+    drawRect(Color.Black.copy(alpha = 0.35f), topLeft = Offset(wall, wall), size = Size(3.dp.toPx(), size.height))
+    drawRect(Color.Black.copy(alpha = 0.3f), topLeft = Offset(wall, wall), size = Size(size.width - 2 * wall, 3.dp.toPx()))
+    // Regalboden
+    val top = size.height - board
+    drawRect(
+        Brush.verticalGradient(listOf(Color(0xFF8A5530), Color(0xFF5A331D)), startY = top, endY = size.height),
+        topLeft = Offset(0f, top),
+        size = Size(size.width, board),
+    )
+    drawRect(Color(0xFFB07A48), topLeft = Offset(0f, top), size = Size(size.width, 1.dp.toPx()))
+    drawRect(Textures.grainBrush, alpha = 0.8f)
+    if (dark) drawRect(Color.Black.copy(alpha = 0.22f))
 }
 
 // ------------------------------------------------------------------- Bücher
@@ -708,14 +778,15 @@ private fun BookCard(
             .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
             .padding(8.dp)
     ) {
-        CoverImage(
-            book = book,
-            file = coverFile,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(0.707f)
-                .shadow(3.dp, RoundedCornerShape(4.dp)),
-        )
+        LeatherFrame(Modifier.fillMaxWidth()) {
+            CoverImage(
+                book = book,
+                file = coverFile,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.707f),
+            )
+        }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Top) {
             Text(
@@ -772,11 +843,8 @@ private fun BookCard(
         location?.let { LocationLabel(it) }
         Spacer(Modifier.height(6.dp))
         if (book.pageCount > 0) {
-            LinearProgressIndicator(
-                progress = { book.progress },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(4.dp))
+            RibbonProgress(progress = book.progress)
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(R.string.page_of, book.lastPage + 1, book.pageCount),
                 style = MaterialTheme.typography.bodySmall,
@@ -840,39 +908,31 @@ private fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Spacer(Modifier.height(96.dp))
-        Icon(
-            painterResource(if (inFolder) R.drawable.ic_folder else R.drawable.ic_book),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(80.dp),
-        )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(72.dp))
+        Fleur(MaterialTheme.colorScheme.primary, width = 52.dp)
+        Spacer(Modifier.height(12.dp))
         Text(
             stringResource(if (inFolder) R.string.empty_folder_title else R.string.empty_title),
-            style = MaterialTheme.typography.titleLarge,
+            style = EasyBooksType.emptyTitle,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
+        FlourishDivider(MaterialTheme.colorScheme.primary, Modifier.padding(vertical = 8.dp), width = 170.dp, height = 16.dp)
         Text(
             stringResource(if (inFolder) R.string.empty_folder_text else R.string.empty_text),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onAdd) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.add_pdf))
-        }
+        Plaque(text = stringResource(R.string.add_pdf), onClick = onAdd, icon = Icons.Filled.Add)
         if (!inFolder && !hasLibraryFolder) {
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onChooseLibraryFolder) {
-                Icon(painterResource(R.drawable.ic_folder), contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.library_folder_choose))
-            }
+            Plaque(
+                text = stringResource(R.string.library_folder_choose),
+                onClick = onChooseLibraryFolder,
+                style = PlaqueStyle.OUTLINE,
+            )
         }
     }
 }
