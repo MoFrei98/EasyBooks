@@ -72,13 +72,14 @@ internal fun PageView(
     pageCount: Int,
     zoom: ZoomMode,
     pageTurn: PageTurn,
+    spread: Boolean,
     darkPages: Boolean,
     pageOffset: () -> Float,
     grabRootY: () -> Float,
     onTap: (x: Float, width: Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PageBox(page, pageTurn, pageOffset, onTap, modifier) {
+    PageBox(page, pageTurn, spread, pageOffset, onTap, modifier) {
         val pageSize by produceState<Size?>(null, page) { value = vm.pageSize(page) }
         val crop = rememberResult(page, zoom) {
             when (zoom) {
@@ -106,14 +107,18 @@ internal fun PageView(
         val height = width * aspect
         val scrollable = height > availableHeight + 1.dp
 
-        val widthPx = with(LocalDensity.current) { width.roundToPx() }
+        val density = LocalDensity.current
+        val widthPx = with(density) { width.roundToPx() }
+        val fray = with(density) { FrayDepth.toPx() }
         val aged = LocalReaderColors.current.aged
         // Im Dark Mode und auf altem Papier erst wissen, ob es eine Bildseite ist, damit nichts aufblitzt.
         val imagePage = if (darkPages || aged) rememberResult(page, "image") { vm.isImagePage(page) } else false
         val bitmap = rememberResult(page, widthPx, crop, aged, darkPages, imagePage) {
             val raw = vm.renderPage(page, widthPx, crop)
             if (aged && imagePage != null) {
-                withContext(Dispatchers.Default) { AgedPaper.print(raw, seed = page, dark = darkPages, picture = imagePage) }
+                withContext(Dispatchers.Default) {
+                    AgedPaper.print(raw, seed = page, dark = darkPages, picture = imagePage, fray = fray, unit = density.density)
+                }
             } else raw
         }
 
@@ -125,6 +130,7 @@ internal fun PageView(
             imagePage = imagePage,
             readFraction = if (pageCount > 1) page / (pageCount - 1f) else 0f,
             pageTurn = pageTurn,
+            spread = spread,
             darkPages = darkPages,
             pageOffset = pageOffset,
             grabRootY = grabRootY,
@@ -143,15 +149,17 @@ internal fun ReflowPageView(
     layout: ReflowLayout,
     index: Int,
     pageTurn: PageTurn,
+    spread: Boolean,
     darkPages: Boolean,
     pageOffset: () -> Float,
     grabRootY: () -> Float,
     onTap: (x: Float, width: Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PageBox(index, pageTurn, pageOffset, onTap, modifier) {
+    PageBox(index, pageTurn, spread, pageOffset, onTap, modifier) {
         val frame = layout.params.frame
         val density = LocalDensity.current
+        val fray = with(density) { FrayDepth.toPx() }
         val screenPage = layout.pages.getOrNull(index)
         val imageOnly = screenPage?.imageOnly == true
         val aged = LocalReaderColors.current.aged
@@ -159,7 +167,10 @@ internal fun ReflowPageView(
             val raw = vm.renderReflowPage(layout, index)
             if (aged && raw != null) {
                 withContext(Dispatchers.Default) {
-                    AgedPaper.print(raw, seed = REFLOW_SEED + index, dark = darkPages, picture = imageOnly)
+                    AgedPaper.print(
+                        raw, seed = REFLOW_SEED + index, dark = darkPages, picture = imageOnly,
+                        fray = fray, unit = density.density,
+                    )
                 }
             } else raw
         }
@@ -174,6 +185,7 @@ internal fun ReflowPageView(
             imagePage = if (darkPages || aged) imageOnly else false,
             readFraction = if (count > 1) (index / (count - 1f)).coerceAtMost(1f) else 0f,
             pageTurn = pageTurn,
+            spread = spread,
             darkPages = darkPages,
             pageOffset = pageOffset,
             grabRootY = grabRootY,
@@ -187,6 +199,7 @@ internal fun ReflowPageView(
 private fun PageBox(
     page: Int,
     pageTurn: PageTurn,
+    spread: Boolean,
     pageOffset: () -> Float,
     onTap: (x: Float, width: Float) -> Unit,
     modifier: Modifier,
@@ -197,7 +210,7 @@ private fun PageBox(
     BoxWithConstraints(
         modifier
             .fillMaxSize()
-            .then(if (curl) Modifier.curlTransform(page, pageOffset) else Modifier)
+            .then(if (curl) Modifier.curlTransform(page, spread, pageOffset) else Modifier)
             .pointerInput(Unit) {
                 detectTapGestures { offset -> currentOnTap(offset.x, size.width.toFloat()) }
             }
@@ -221,6 +234,7 @@ private fun Sheet(
     imagePage: Boolean?,
     readFraction: Float,
     pageTurn: PageTurn,
+    spread: Boolean,
     darkPages: Boolean,
     pageOffset: () -> Float,
     grabRootY: () -> Float,
@@ -232,8 +246,8 @@ private fun Sheet(
     val nightFilter = remember { PageColors.night(DarkReaderColors.paper, DarkReaderColors.ink) }
     val shadowColor = readerColors.shade
     // Nur während die Seite gerade umgeblättert wird, zeichnen wir sie als gebogenes 3D-Blatt.
-    val turning by remember(curl) {
-        derivedStateOf { curl && pageOffset().let { it > 0f && it < 1f } }
+    val turning by remember(curl, spread, page) {
+        derivedStateOf { curl && curlsAfter(page, spread) && pageOffset().let { it > 0f && it < 1f } }
     }
     val colorFilter = when {
         // Altes Papier: Die Seite ist schon auf das Papier gedruckt.
@@ -277,7 +291,13 @@ private fun Sheet(
             dim = {
                 // Die Seite darunter ist dunkler, solange sie noch bedeckt ist.
                 val offset = pageOffset()
-                if (curl && offset < 0f && offset > -1f) -offset else 0f
+                if (curl && curlsAfter(page - 1, spread) && offset < 0f && offset > -1f) -offset else 0f
+            },
+            aged = readerColors.aged,
+            side = when {
+                !spread -> PageSide.SINGLE
+                page % 2 == 0 -> PageSide.RIGHT
+                else -> PageSide.LEFT
             },
             modifier = Modifier.size(width, height),
         ) {
@@ -318,15 +338,32 @@ private fun <T> rememberResult(vararg keys: Any?, load: suspend () -> T): T? {
 }
 
 /**
+ * Wird nach Seite [page] umgeblättert (sonst gleiten die Seiten wie in der Slideshow)?
+ *
+ * Mit [spread] liest man wie in einem aufgeschlagenen Buch: Seite 1 liegt rechts, Seite 2
+ * links, Seite 3 rechts usw. Von der linken zur rechten Seite wandern nur die Augen weiter,
+ * die Seiten gleiten. Erst nach einer rechten Seite (gerader Index) wird umgeblättert.
+ */
+internal fun curlsAfter(page: Int, spread: Boolean): Boolean = !spread || page.mod(2) == 0
+
+/**
  * Buch-Modus: Alle Seiten bleiben an ihrem Platz liegen, statt mit dem Pager zur Seite
  * zu gleiten. Seiten mit kleinerer Nummer liegen oben. Die oberste Seite wird während
  * des Wischens als gebogenes 3D-Blatt gezeichnet (siehe [drawCurledPage]).
+ * Bei Doppelseiten ([spread]) gleitet der Übergang von links nach rechts wie im Pager.
  */
-private fun Modifier.curlTransform(page: Int, pageOffset: () -> Float): Modifier =
+private fun Modifier.curlTransform(page: Int, spread: Boolean, pageOffset: () -> Float): Modifier =
     zIndex(-page.toFloat()).graphicsLayer {
         val offset = pageOffset()
-        // Natürliche Position wäre um offset Seitenbreiten verschoben – das heben wir auf.
-        translationX = offset * size.width
-        // Nur die beiden beteiligten Seiten sind sichtbar.
-        alpha = if (offset <= -1f || offset >= 1f) 0f else 1f
+        // Übergang, an dem diese Seite gerade beteiligt ist: nach ihr (offset > 0) oder vor ihr.
+        val transition = if (offset >= 0f) page else page - 1
+        if (curlsAfter(transition, spread)) {
+            // Natürliche Position wäre um offset Seitenbreiten verschoben – das heben wir auf.
+            translationX = offset * size.width
+            // Nur die beiden beteiligten Seiten sind sichtbar.
+            alpha = if (offset <= -1f || offset >= 1f) 0f else 1f
+        } else {
+            translationX = 0f
+            alpha = 1f
+        }
     }

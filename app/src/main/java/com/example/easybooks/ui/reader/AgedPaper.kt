@@ -19,7 +19,11 @@ import androidx.compose.ui.graphics.toArgb
 import com.example.easybooks.ui.theme.AgedDarkReaderColors
 import com.example.easybooks.ui.theme.AgedLightReaderColors
 import com.example.easybooks.ui.theme.Textures
+import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.hypot
+import kotlin.math.pow
 import kotlin.math.max
 import kotlin.random.Random
 
@@ -31,11 +35,19 @@ import kotlin.random.Random
  * zu Papier, Schwarz zu brauner Tinte. Bildseiten (z. B. Cover) werden nur leicht getönt,
  * damit ihre Farben stimmen.
  *
+ * Die Kanten sind leicht ausgefranst wie bei altem, gerissenem Papier: An den Rändern wird
+ * das Blatt durchsichtig, entlang einer unregelmäßigen Linie, und der Rand ist etwas
+ * stärker vergilbt.
+ *
  * Dieselbe Seite sieht immer gleich aus ([seed]), verschiedene Seiten etwas anders.
  */
 internal object AgedPaper {
 
-    fun print(page: ImageBitmap, seed: Int, dark: Boolean, picture: Boolean): ImageBitmap {
+    /**
+     * @param fray größte Tiefe der Ausfransung in Pixeln ([FrayDepth])
+     * @param unit Pixel pro dp, damit die Fasern auf jedem Bildschirm gleich groß wirken
+     */
+    fun print(page: ImageBitmap, seed: Int, dark: Boolean, picture: Boolean, fray: Float, unit: Float): ImageBitmap {
         val src = page.asAndroidBitmap()
         val width = src.width
         val height = src.height
@@ -72,7 +84,60 @@ internal object AgedPaper {
             }
         }
         drawEdges(canvas, width, height, dark)
+        if (fray > 0f) frayEdges(out, seed, fray, unit)
         return out.asImageBitmap()
+    }
+
+    /** Macht die Kanten unregelmäßig durchsichtig und färbt den Riss etwas dunkler. */
+    private fun frayEdges(bitmap: Bitmap, seed: Int, fray: Float, unit: Float) {
+        val w = bitmap.width
+        val h = bitmap.height
+        // Streifen, in dem gerechnet wird: Ausfransung plus vergilbter Saum dahinter.
+        val band = ceil(fray + 3f * unit).toInt().coerceAtMost(minOf(w, h) / 2)
+        if (band <= 0) return
+        val top = FloatArray(w) { Deckle.depth(seed, 0, it.toFloat(), unit, fray) }
+        val bottom = FloatArray(w) { Deckle.depth(seed, 2, it.toFloat(), unit, fray) }
+        val left = FloatArray(h) { Deckle.depth(seed, 3, it.toFloat(), unit, fray) }
+        val right = FloatArray(h) { Deckle.depth(seed, 1, it.toFloat(), unit, fray) }
+        val seam = 3f * unit
+
+        fun region(x0: Int, y0: Int, rw: Int, rh: Int) {
+            if (rw <= 0 || rh <= 0) return
+            val px = IntArray(rw * rh)
+            bitmap.getPixels(px, 0, rw, x0, y0, rw, rh)
+            for (yy in 0 until rh) for (xx in 0 until rw) {
+                val x = x0 + xx
+                val y = y0 + yy
+                var alpha = 1f
+                var tint = 1f
+                fun edge(distance: Float, depth: Float) {
+                    if (distance >= band) return
+                    alpha *= smoothstep(depth - 0.6f, depth + 0.6f, distance)
+                    tint = minOf(tint, 1f - 0.22f * (1f - smoothstep(depth, depth + seam, distance)))
+                }
+                edge(y + 0.5f, top[x])
+                edge(h - y - 0.5f, bottom[x])
+                edge(x + 0.5f, left[y])
+                edge(w - x - 0.5f, right[y])
+                if (alpha >= 1f && tint >= 1f) continue
+                val c = px[yy * rw + xx]
+                val a = (alpha * 255f).toInt().coerceIn(0, 255)
+                val r = (((c shr 16) and 0xFF) * tint).toInt()
+                val g = (((c shr 8) and 0xFF) * tint).toInt()
+                val b = ((c and 0xFF) * tint).toInt()
+                px[yy * rw + xx] = (a shl 24) or (r shl 16) or (g shl 8) or b
+            }
+            bitmap.setPixels(px, 0, rw, x0, y0, rw, rh)
+        }
+        region(0, 0, w, band)
+        region(0, h - band, w, band)
+        region(0, band, band, h - 2 * band)
+        region(w - band, band, band, h - 2 * band)
+    }
+
+    private fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
+        val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+        return t * t * (3f - 2f * t)
     }
 
     /** Grundton, Flecken, Fasern und Stockflecken. */
@@ -155,4 +220,38 @@ internal object AgedPaper {
 
     /** Grundton des hellen alten Papiers (etwas heller als die Ränder). */
     private const val BASE_LIGHT = 0xFFEBDAB2.toInt()
+}
+
+/** Größte Tiefe der ausgefransten Kanten. */
+internal val FrayDepth = 3.dp
+
+/** Verlauf einer ausgefransten Papierkante: grobe Wellen, kleinere Zacken und feine Fasern. */
+internal object Deckle {
+    /**
+     * Wie tief die Kante [edge] (0 oben, 1 rechts, 2 unten, 3 links) an Stelle [pos] (Pixel
+     * entlang der Kante) ausgefranst ist: 0 bis [max]. Meist nur wenig, stellenweise tiefer.
+     */
+    fun depth(seed: Int, edge: Int, pos: Float, unit: Float, max: Float): Float {
+        val s = seed * 31 + edge * 7919
+        val coarse = noise(s, pos / (18f * unit))
+        val mid = noise(s + 101, pos / (4.5f * unit))
+        val fine = noise(s + 211, pos / (1.4f * unit))
+        val v = 0.5f * coarse + 0.32f * mid + 0.18f * fine
+        return max * v.pow(1.5f)
+    }
+
+    private fun noise(seed: Int, x: Float): Float {
+        val i = floor(x).toInt()
+        val f = x - i
+        val t = f * f * (3f - 2f * f)
+        val a = hash(seed, i)
+        return a + (hash(seed, i + 1) - a) * t
+    }
+
+    private fun hash(seed: Int, i: Int): Float {
+        var h = seed * 374761393 + i * 668265263
+        h = (h xor (h ushr 13)) * 1274126177
+        h = h xor (h ushr 16)
+        return (h and 0xFFFFFF) / 16777216f
+    }
 }

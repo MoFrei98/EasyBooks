@@ -73,6 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.easybooks.R
 import com.example.easybooks.data.AppSettings
+import com.example.easybooks.data.PaperStyle
 import com.example.easybooks.data.PageTurn
 import com.example.easybooks.data.ZoomMode
 import com.example.easybooks.reflow.ReflowFrame
@@ -89,6 +90,7 @@ import com.example.easybooks.ui.theme.woodBackground
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 @Composable
@@ -162,6 +164,7 @@ private fun Reader(
                 pageCount = ready.pageCount,
                 zoom = settings.pageSize,
                 pageTurn = settings.pageTurn,
+                spread = settings.spread,
                 // Im Dark Mode werden die Seiten immer abgedunkelt.
                 darkPages = LocalDarkTheme.current,
                 pageOffset = pageOffset,
@@ -233,6 +236,7 @@ private fun ReflowReader(
                     layout = current,
                     index = index,
                     pageTurn = settings.pageTurn,
+                    spread = settings.spread,
                     darkPages = LocalDarkTheme.current,
                     pageOffset = pageOffset,
                     grabRootY = grabRootY,
@@ -323,6 +327,7 @@ private fun PagedReader(
     ImmersiveMode(enabled = !barsVisible)
 
     val bookPages = settings.pageTurn == PageTurn.CURL
+    val spread = settings.spread
     val context = LocalContext.current
     val sound = remember(settings.pageTurnSound) {
         if (settings.pageTurnSound) PageTurnSound(context.applicationContext) else null
@@ -331,7 +336,7 @@ private fun PagedReader(
 
     // Seite, für die das Geräusch zuletzt gespielt wurde (verhindert doppeltes Rascheln).
     val soundedPage = remember { IntArray(1) { -1 } }
-    LaunchedEffect(pagerState, sound, bookPages) {
+    LaunchedEffect(pagerState, sound, bookPages, spread) {
         if (sound == null) return@LaunchedEffect
         snapshotFlow { pagerState.currentPage to pagerState.settledPage }.collect { (current, settled) ->
             when {
@@ -339,7 +344,8 @@ private fun PagedReader(
                 // Beim Wischen kippt die Seite über die Mitte: jetzt raschelt es.
                 abs(current - settled) == 1 && current != soundedPage[0] -> {
                     soundedPage[0] = current
-                    sound.play(bookPages)
+                    // Von der linken zur rechten Seite gehen nur die Augen weiter: kein Rascheln.
+                    if (curlsAfter(min(current, settled), spread)) sound.play(bookPages)
                 }
             }
         }
@@ -354,12 +360,14 @@ private fun PagedReader(
         val target = (base + delta).coerceIn(0, pagerState.pageCount - 1)
         if (target == base) return
         soundedPage[0] = target
-        sound?.play(bookPages)
+        // Bei Doppelseiten wird nur nach einer rechten Seite umgeblättert, sonst gleiten die Seiten.
+        val turnsLeaf = bookPages && curlsAfter(min(base, target), spread)
+        if (!spread || turnsLeaf) sound?.play(bookPages)
         scope.launch {
             pagerState.animateScrollToPage(
                 page = target,
                 animationSpec = tween(
-                    durationMillis = if (bookPages) TAP_TURN_BOOK_MS else TAP_TURN_SLIDE_MS,
+                    durationMillis = if (turnsLeaf) TAP_TURN_BOOK_MS else TAP_TURN_SLIDE_MS,
                     easing = FastOutSlowInEasing,
                 ),
             )
@@ -580,3 +588,10 @@ private val ReflowMarginBottom = 22.dp
 /** Dauer des Umblätterns beim Tippen auf den Rand. */
 private const val TAP_TURN_BOOK_MS = 1000
 private const val TAP_TURN_SLIDE_MS = 450
+
+/**
+ * Lesen wie in einem aufgeschlagenen Buch: auf altem Papier mit Buchseiten. Dann liegen
+ * immer eine linke und eine rechte Seite nebeneinander (siehe [curlsAfter]).
+ */
+private val AppSettings.spread: Boolean
+    get() = pageTurn == PageTurn.CURL && paper == PaperStyle.AGED
